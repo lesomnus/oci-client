@@ -1,0 +1,16 @@
+{
+	"name": "lesomnus-oci-client",
+	"build": {
+		"dockerfile": "Dockerfile",
+		"context": "."
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"biomejs.biome",
+				"vitest.explorer",
+				"streetsidesoftware.code-spell-checker"
+			]
+		}
+	}
+}
