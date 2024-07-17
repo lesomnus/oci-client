@@ -1,16 +1,11 @@
 {
 	"name": "lesomnus-oci-client",
-	"build": {
-		"dockerfile": "Dockerfile",
-		"context": "."
-	},
+	"dockerComposeFile": "docker-compose.yaml",
+	"service": "dev",
+	"workspaceFolder": "/workspace",
 	"customizations": {
 		"vscode": {
-			"extensions": [
-				"biomejs.biome",
-				"vitest.explorer",
-				"streetsidesoftware.code-spell-checker"
-			]
+			"extensions": ["biomejs.biome", "vitest.explorer", "streetsidesoftware.code-spell-checker"]
 		}
 	}
 }

@@ -1,5 +1,13 @@
 {
 	"$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+	"files": {
+		"include": ["*.json", "*.ts", "*.mts"]
+	},
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
+	},
 	"organizeImports": {
 		"enabled": true
 	},
@@ -8,7 +16,7 @@
 		"indentStyle": "tab",
 		"lineEnding": "lf",
 		"indentWidth": 4,
-		"lineWidth": 180
+		"lineWidth": 140
 	},
 	"linter": {
 		"enabled": true,

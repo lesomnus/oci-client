@@ -1,7 +1,7 @@
 OCI Client
 ---
 
-Implementation of client for [*OCI*](https://opencontainers.org/) [*Distribution*](https://github.com/opencontainers/distribution-spec).
+Client implementation of [*OCI*](https://opencontainers.org/) [*Distribution*](https://github.com/opencontainers/distribution-spec).
 It is designed to work in the browser but keeps *Node.js* in mind.
 
 ## Install
@@ -19,7 +19,7 @@ import { ClientV2 } from '@lesomns/oci-client'
 const client = new ClientV2('index.docker.io')
 await client.ping()
 
-const res = await client.repo('library/node').tags.getList()
+const res = await client.repo('library/node').tags.list()
 console.log(res.unwrap())
 // {
 //   "name": "library/node",
@@ -51,7 +51,7 @@ Highlighted methods are currently implemented.
 
 | ID      | Method         | API Endpoint                                                     |
 | ------- | -------------- | ---------------------------------------------------------------- |
-| end-1   | GET            | /v2/                                                             |
+| end-1   | `GET`          | /v2/                                                             |
 | end-2   | GET / HEAD     | /v2/\<name\>/blobs/\<digest\>                                    |
 | end-3   | `GET` / `HEAD` | /v2/\<name\>/manifests/\<reference\>                             |
 | end-4a  | POST           | /v2/\<name\>/blobs/uploads/                                      |

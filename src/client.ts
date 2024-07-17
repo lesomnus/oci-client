@@ -4,10 +4,10 @@ import { Ref } from './ref'
 import Patterns from './regexp'
 import { Repo } from './repo'
 import { type Result, result } from './result'
-import { FetchTransport, type Transport, TransportChain } from './transport'
+import { FetchTransport, type Transport, TransportChain, type TransportMiddleware } from './transport'
 
 export type ClientInit = {
-	transport?: Transport
+	transport?: Transport | [TransportMiddleware, ...TransportMiddleware[], Transport]
 }
 
 export class ClientV2 {
@@ -21,12 +21,21 @@ export class ClientV2 {
 			throw new Error('invalid domain')
 		}
 
-		this.transport =
-			init?.transport ??
-			new TransportChain([
+		if (init === undefined) {
+			init = {}
+		}
+
+		let transport = init.transport
+		if (transport === undefined) {
+			transport = [
 				new TransportAuthorizer(), //
 				new FetchTransport(),
-			])
+			]
+		}
+		if (Array.isArray(transport)) {
+			transport = new TransportChain(transport)
+		}
+		this.transport = transport
 	}
 
 	/**

@@ -1,4 +1,4 @@
-export { default } from './codes'
+export { default as Codes } from './codes'
 
 export * from './digest'
 export * from './ref'

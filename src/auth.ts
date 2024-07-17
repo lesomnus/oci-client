@@ -28,7 +28,7 @@ export class TransportAuthorizer implements TransportMiddleware {
 	async fetch(resource: RequestInfo | URL, init: undefined | RequestInit, next: Transport): Promise<Response> {
 		const res = await next.fetch(resource, init)
 		if (res.status !== 401) {
-			throw res
+			return res
 		}
 
 		const challenge = res.headers.get('www-authenticate')

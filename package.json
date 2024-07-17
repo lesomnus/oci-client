@@ -1,21 +1,46 @@
 {
 	"name": "@lesomnus/oci-client",
-	"private": true,
-	"version": "0.0.0",
+	"version": "0.0.1",
+	"description": "Client implementation of OCI Distribution for Web",
+	"author": {
+		"name": "Seunghyun Hwang",
+		"email": "lesomnus@gmail.com"
+	},
+	"license": "Apache-2.0",
 	"type": "module",
+	"files": ["dist", "src", "!src/*.test.ts"],
+	"main": "./dist/main.cjs.js",
+	"module": "./dist/main.js",
+	"exports": {
+		".": {
+			"require": "./dist/main.cjs.js",
+			"import": "./dist/main.js",
+			"types": "./dist/index.d.ts"
+		},
+		"./media-types": {
+			"require": "./dist/media-types.cjs.js",
+			"import": "./dist/media-types.js",
+			"types": "./dist/media-types/index.d.ts"
+		}
+	},
 	"scripts": {
-		"dev": "vite",
 		"build": "tsc && vite build",
-		"preview": "vite preview",
 		"test": "vitest",
-		"test-with-ui": "vitest --ui"
+		"test-with-ui": "vitest --ui",
+		"coverage": "vitest run --coverage",
+		"check": "biome check --write ."
 	},
 	"devDependencies": {
 		"@biomejs/biome": "1.8.3",
+		"@types/node": "^20.14.11",
+		"@vitest/coverage-v8": "^2.0.3",
 		"@vitest/ui": "^2.0.3",
 		"jsdom": "^24.1.0",
+		"tsx": "^4.16.2",
 		"typescript": "^5.2.2",
 		"vite": "^5.3.1",
-		"vitest": "^2.0.3"
+		"vite-plugin-dts": "^3.9.1",
+		"vitest": "^2.0.3",
+		"zx": "^8.1.4"
 	}
 }

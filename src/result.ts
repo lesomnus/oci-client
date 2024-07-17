@@ -83,7 +83,7 @@ export function probe(raw: Response): Probe {
 		case 200:
 			return { raw, ok: true }
 		case 404:
-			return { raw, ok: true }
+			return { raw, ok: false }
 
 		default:
 			throw new ResError(raw, `unexpected status code: ${raw.status}`)

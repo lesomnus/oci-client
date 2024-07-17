@@ -1,0 +1,38 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    command: [ "sh", "-c", "while sleep 1000; do :; done" ]
+
+    privileged: true
+
+    volumes:
+      - type: bind
+        source: ..
+        target: /workspace
+
+  docker:
+    image: library/docker:26-dind
+    command:
+      - --tlsverify=false
+      - --insecure-registry=registry:5000
+
+    privileged: true
+
+  registry:
+    image: library/registry:2.8.3
+    command: /etc/distribution/config.yml
+
+    volumes:
+      - type: bind
+        source: ./registry.yaml
+        target: /etc/distribution/config.yml
+        read_only: true
+      - type: volume
+        source: registry
+        target: /var/lib/registry
+
+volumes:
+  registry:

@@ -1,5 +1,7 @@
+import { mediaType } from '../media-type'
+
 /**
- * @see {@link https://github.com/opencontainers/image-spec/blob/main/descriptor.md|spec}
+ * @see {@link https://github.com/opencontainers/image-spec/blob/main/descriptor.md | spec}
  */
 export type DescriptorV1 = {
 	mediaType: string
@@ -13,7 +15,7 @@ export type DescriptorV1 = {
 
 export namespace image {
 	/**
-	 * @see  {@link https://github.com/opencontainers/image-spec/blob/main/image-index.md|spec}
+	 * @see  {@link https://github.com/opencontainers/image-spec/blob/main/image-index.md | spec}
 	 */
 	export type IndexV1 = {
 		schemaVersion: number
@@ -64,10 +66,10 @@ export namespace image {
 		subject?: DescriptorV1
 		annotations?: Record<string, string>
 	}
-	export const indexV1: string | IndexV1 = 'application/vnd.oci.image.index.v1+json'
+	export const indexV1 = mediaType<IndexV1>('application/vnd.oci.image.index.v1+json')
 
 	/**
-	 * @see {@link https://github.com/opencontainers/image-spec/blob/main/manifest.md|spec}
+	 * @see {@link https://github.com/opencontainers/image-spec/blob/main/manifest.md | spec}
 	 */
 	export type ManifestV1 = {
 		schemaVersion: number
@@ -85,5 +87,5 @@ export namespace image {
 		subject?: DescriptorV1
 		annotations?: Record<string, string>
 	}
-	export const manifestV1: string | ManifestV1 = 'application/vnd.oci.image.manifest.v1+json'
+	export const ManifestV1 = mediaType<ManifestV1>('application/vnd.oci.image.manifest.v1+json')
 }

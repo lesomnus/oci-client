@@ -1,4 +1,9 @@
 {
+	"files.readonlyInclude": {
+		"dist/**/*": true,
+		"coverage/**/*": true,
+		"package-lock.json": true
+	},
 	"[javascript]": {
 		"editor.defaultFormatter": "biomejs.biome"
 	},
