@@ -44,6 +44,7 @@ export class TransportChain implements Transport, TransportMiddleware {
 }
 
 function normalizeReq(resource: RequestInfo | URL, init: ReqInit | undefined): [URL, ReqInit | undefined] {
+	// TODO: make init.method === 'GET' if it is undefined?
 	if (resource instanceof URL) {
 		return [resource, init]
 	}
@@ -74,25 +75,29 @@ export class Unsecure implements TransportMiddleware {
 	}
 }
 
-/**
- * Add a prefix to the URL path.
- * If the URL already has the prefix, no changes are made.
- */
-export class PathPrefix implements TransportMiddleware {
-	constructor(readonly prefix: string) {
-		if (!prefix.startsWith('/')) {
-			// normalize to absolute path.
-			this.prefix = `/${prefix}`
-		}
-	}
+export class PathRewrite implements TransportMiddleware {
+	constructor(readonly rewrite: (path: string) => string) {}
 
 	fetch(resource: RequestInfo | URL, init: ReqInit | undefined, next: Transport): Promise<Response> {
 		;[resource, init] = normalizeReq(resource, init)
 
-		if (!resource.pathname.startsWith(this.prefix)) {
-			resource.pathname = `${this.prefix}${resource.pathname}`
-		}
+		resource.pathname = this.rewrite(resource.pathname)
 		return next.fetch(resource, init)
+	}
+}
+
+/**
+ * Add a prefix to the URL path.
+ * If the URL already has the prefix, no changes are made.
+ */
+export class PathPrefix extends PathRewrite implements TransportMiddleware {
+	constructor(prefix: string) {
+		if (!prefix.startsWith('/')) {
+			// normalize to absolute path.
+			prefix = `/${prefix}`
+		}
+
+		super(p => (p.startsWith(prefix) ? p : `${prefix}${p}`))
 	}
 }
 
@@ -111,6 +116,11 @@ export class Accept implements TransportMiddleware {
 	}
 
 	fetch(resource: RequestInfo | URL, init: ReqInit | undefined, next: Transport): Promise<Response> {
+		;[resource, init] = normalizeReq(resource, init)
+		if (!(init?.method === undefined || init.method === 'GET')) {
+			return next.fetch(resource, init)
+		}
+
 		let v = ''
 		switch (init?.endpoint?.resource) {
 			case 'manifests':

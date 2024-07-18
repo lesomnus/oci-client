@@ -34,45 +34,73 @@ type As = {
 	as<U>(mediaType: string | U): undefined | U
 }
 
-export type Result<T extends {} = Res> = ResBase &
-	T & {
-		/**
-		 * Returns a structured message if the response is not an error,
-		 * but it throws {@link ResError} after invoking `cb` if the response is an error.
-		 *
-		 * @example
-		 * ```ts
-		 * // Assume `res` an error.
-		 * const v = res.unwrap() // throws `ResError`
-		 * const v = res.unwrap(() => { throw new Error('...') }) // throws `Error`
-		 * ```
-		 */
-		unwrap(cb?: (errors: ErrorEntry[]) => void): never | (ResBase & T & As)
+export type Result<T extends {} = Res> = ResBase & {
+	/**
+	 * Returns a structured message if the response is not an error,
+	 * but it throws {@link ResError} after invoking `cb` if the response is an error.
+	 *
+	 * @example
+	 * ```ts
+	 * // Assume `res` an error.
+	 * const v = res.unwrap() // throws `ResError`
+	 * const v = res.unwrap(() => { throw new Error('...') }) // throws `Error`
+	 * ```
+	 */
+	unwrap(cb?: (errors: ErrorEntry[]) => void): never | Promise<ResBase & T & As>
+}
+
+export async function result<T extends {}>(raw: Response, onSuccess: () => Promise<T>): Promise<Result<T>> {
+	if (raw.status >= 500) {
+		throw new ResError(raw, 'server error')
+	}
+	if (raw.status >= 400) {
+		let getV: Promise<ErrorEntry[]> | undefined
+		return {
+			raw,
+			async unwrap(cb) {
+				if (getV === undefined) {
+					const t = raw.headers.get('Content-Type')
+					if (t?.includes('application.json')) {
+						getV = raw.json().then(v => v.errors)
+					} else {
+						getV = Promise.resolve([])
+					}
+				}
+
+				const errors = await getV
+				cb?.(errors)
+				throw new ResError(raw, 'expected a result but was an error')
+			},
+		}
 	}
 
-export function result<T extends Res>(res: T): Result<T> {
-	const isErr = 'errors' in res
+	let getV: Promise<T> | undefined
 	const rst = {
-		...res,
-		unwrap(cb?: (errors: ErrorEntry[]) => void) {
-			if (isErr) {
-				if (cb) cb(res.errors)
-				throw new ResError(res.raw, 'expected a result but was an error')
-			}
-			return this
-		},
-		as<U>(mediaType: string | U): undefined | U {
-			const t = this.raw.headers.get('Content-type')
-			if (t !== null && t === mediaType) {
-				return res as unknown as U
-			}
-			if ('mediaType' in res && res.mediaType === mediaType) {
-				return res as unknown as U
+		raw,
+		async unwrap() {
+			if (getV === undefined) {
+				getV = onSuccess()
 			}
 
-			return undefined
+			const v = await getV
+			return {
+				raw,
+				...v,
+				as<U>(mediaType: string | U): undefined | U {
+					const t = this.raw.headers.get('Content-Type')
+					if (t !== null && t === mediaType) {
+						return v as unknown as U
+					}
+					if ('mediaType' in v && v.mediaType === mediaType) {
+						return v as unknown as U
+					}
+
+					return undefined
+				},
+			}
 		},
 	}
+
 	return rst
 }
 

@@ -1,6 +1,16 @@
 import { mediaType } from '../media-type'
 
 /**
+ * @see {@link https://github.com/opencontainers/image-spec/blob/main/manifest.md#guidance-for-an-empty-descriptor | Guidance for an Empty Descriptor}
+ */
+export const empty: DescriptorV1 = {
+	mediaType: 'application/vnd.oci.empty.v1+json',
+	digest: 'sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a',
+	size: 2,
+	data: 'e30=',
+}
+
+/**
  * @see {@link https://github.com/opencontainers/image-spec/blob/main/descriptor.md | spec}
  */
 export type DescriptorV1 = {
@@ -72,8 +82,14 @@ export namespace image {
 	 * @see {@link https://github.com/opencontainers/image-spec/blob/main/manifest.md | spec}
 	 */
 	export type ManifestV1 = {
-		schemaVersion: number
-		mediaType: 'application/vnd.oci.image.manifest.v1+json'
+		/**
+		 * Specifies the image manifest schema version.
+		 * For this version of the specification, this MUST be 2 to ensure backward compatibility with older versions of Docker.
+		 * The value of this field will not change.
+		 * This field MAY be removed in a future version of the specification.
+		 */
+		schemaVersion: (number & {}) & 2
+		mediaType: (string & {}) | 'application/vnd.oci.image.manifest.v1+json'
 		artifactType?: string
 		config: DescriptorV1
 		layers: (Omit<DescriptorV1, 'mediaType'> & {

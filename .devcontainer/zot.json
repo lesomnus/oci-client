@@ -6,7 +6,8 @@
 	},
 	"storage": {
 		"rootDirectory": "/var/lib/registry",
-		"commit": true
+		"commit": true,
+		"dedupe": true
 	},
 	"log": {
 		"level": "debug"

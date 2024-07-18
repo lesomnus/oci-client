@@ -1,8 +1,8 @@
+import { RepoV2 } from './api'
 import { TransportAuthorizer } from './auth'
 import { ResError } from './error'
 import { Ref } from './ref'
 import Patterns from './regexp'
-import { Repo } from './repo'
 import { type Result, result } from './result'
 import { FetchTransport, type Transport, TransportChain, type TransportMiddleware } from './transport'
 
@@ -63,16 +63,16 @@ export class ClientV2 {
 			throw new ResError(raw, msg)
 		}
 
-		return result({ raw })
+		return result(raw, () => Promise.resolve({}))
 	}
 
-	repo(ref: string | Ref): Repo {
+	repo(ref: string | Ref): RepoV2 {
 		if (typeof ref === 'string') {
 			ref = Ref.parse(ref)
 		}
 		if (ref.domain === undefined) {
 			ref = ref.withDomain(this.domain)
 		}
-		return new Repo(this.transport, ref)
+		return new RepoV2(this.transport, ref)
 	}
 }
