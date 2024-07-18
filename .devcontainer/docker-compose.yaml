@@ -22,13 +22,12 @@ services:
     privileged: true
 
   registry:
-    image: library/registry:2.8.3
-    command: /etc/distribution/config.yml
+    image: ghcr.io/project-zot/zot:v2.1.0
 
     volumes:
       - type: bind
-        source: ./registry.yaml
-        target: /etc/distribution/config.yml
+        source: ./zot.json
+        target: /etc/zot/config.yml
         read_only: true
       - type: volume
         source: registry

@@ -1,0 +1,22 @@
+{
+	"distSpecVersion": "1.0.1",
+	"http": {
+		"address": "0.0.0.0",
+		"port": "5000"
+	},
+	"storage": {
+		"rootDirectory": "/var/lib/registry",
+		"commit": true
+	},
+	"log": {
+		"level": "debug"
+	},
+	"extensions": {
+		"search": {
+			"enable": true
+		},
+		"ui": {
+			"enable": true
+		}
+	}
+}

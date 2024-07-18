@@ -1,24 +1,5 @@
+import type { Endpoint } from './endpoint'
 import type { MediaType } from './media-type'
-import type { Reference } from './ref'
-
-export type Endpoint = {
-	name: string
-} & (
-	| { method: 'GET'; resource: 'blobs'; digest: string } // end-2
-	| { method: 'HEAD'; resource: 'blobs'; digest: string } // end-2
-	| { method: 'GET'; resource: 'manifests'; reference: Reference } // end-3
-	| { method: 'HEAD'; resource: 'manifests'; reference: Reference } // end-3
-	| { method: 'POST'; resource: 'blobs'; action: 'uploads'; digest?: string } // end-4
-	| { method: 'PATCH'; resource: 'blobs'; action: 'uploads'; reference: Reference; digest?: string } // end-5
-	| { method: 'PUT'; resource: 'blobs'; action: 'uploads'; reference: Reference; digest?: string } // end-6
-	| { method: 'PUT'; resource: 'blobs'; action: 'manifests'; reference: Reference; digest?: string } // end-7
-	| { method: 'GET'; resource: 'tags'; action: 'list'; n?: number; last?: string } // end-8
-	| { method: 'DELETE'; resource: 'manifests'; reference: Reference } // end-9
-	| { method: 'DELETE'; resource: 'blobs'; digest: string } // end-10
-	| { method: 'POST'; resource: 'blobs'; action: 'uploads'; mount?: string; from?: string } // end-11
-	| { method: 'GET'; resource: 'referrers'; artifactType?: string } // end-12
-	| { method: 'GET'; resource: 'blobs'; action: 'uploads'; reference: Reference } // end-13
-)
 
 // Extra field for transport internal use.
 export type ReqInit = RequestInit & {
@@ -36,7 +17,7 @@ export class FetchTransport implements Transport {
 }
 
 export interface TransportMiddleware {
-	fetch(resource: RequestInfo | URL, init: undefined | ReqInit, next: Transport): Promise<Response>
+	fetch(resource: RequestInfo | URL, init: ReqInit | undefined, next: Transport): Promise<Response>
 }
 
 export class TransportChain implements Transport, TransportMiddleware {
@@ -62,25 +43,62 @@ export class TransportChain implements Transport, TransportMiddleware {
 	}
 }
 
+function normalizeReq(resource: RequestInfo | URL, init: ReqInit | undefined): [URL, ReqInit | undefined] {
+	if (resource instanceof URL) {
+		return [resource, init]
+	}
+
+	let u: URL
+	if (typeof resource === 'string') {
+		u = new URL(resource)
+	} else {
+		u = new URL(resource.url)
+		init = new Request(resource, init)
+	}
+
+	return [u, init] as const
+}
+
+/**
+ * Change the protocol part of the URL from "https" to "http".
+ * Note that no changes are made if the protocol is not "https".
+ */
 export class Unsecure implements TransportMiddleware {
-	fetch(resource: RequestInfo | URL, init: undefined | ReqInit, next: Transport): Promise<Response> {
-		let u = resource.toString()
-		if (!u.startsWith('https://')) {
-			return next.fetch(resource, init)
-		}
+	fetch(resource: RequestInfo | URL, init: ReqInit | undefined, next: Transport): Promise<Response> {
+		;[resource, init] = normalizeReq(resource, init)
 
-		u = `http${u.slice('https'.length)}`
-		let req: Request
-		if (typeof resource === 'string' || resource instanceof URL) {
-			req = new Request(u)
-		} else {
-			req = new Request(u, resource)
+		if (resource.protocol !== 'https') {
+			resource.protocol = 'http'
 		}
-
-		return next.fetch(req, init)
+		return next.fetch(resource, init)
 	}
 }
 
+/**
+ * Add a prefix to the URL path.
+ * If the URL already has the prefix, no changes are made.
+ */
+export class PathPrefix implements TransportMiddleware {
+	constructor(readonly prefix: string) {
+		if (!prefix.startsWith('/')) {
+			// normalize to absolute path.
+			this.prefix = `/${prefix}`
+		}
+	}
+
+	fetch(resource: RequestInfo | URL, init: ReqInit | undefined, next: Transport): Promise<Response> {
+		;[resource, init] = normalizeReq(resource, init)
+
+		if (!resource.pathname.startsWith(this.prefix)) {
+			resource.pathname = `${this.prefix}${resource.pathname}`
+		}
+		return next.fetch(resource, init)
+	}
+}
+
+/**
+ * Append HTTP "Accept" header on the request for the resource (tags, manifests, etc.).
+ */
 export class Accept implements TransportMiddleware {
 	#manifests: string
 
@@ -92,7 +110,7 @@ export class Accept implements TransportMiddleware {
 		this.#manifests = manifests?.map(v => `${v}`).join(', ') ?? ''
 	}
 
-	fetch(resource: RequestInfo | URL, init: undefined | ReqInit, next: Transport): Promise<Response> {
+	fetch(resource: RequestInfo | URL, init: ReqInit | undefined, next: Transport): Promise<Response> {
 		let v = ''
 		switch (init?.endpoint?.resource) {
 			case 'manifests':

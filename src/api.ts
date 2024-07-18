@@ -1,7 +1,8 @@
+import type { Endpoint } from './endpoint'
 import { ResError } from './error'
 import type { Ref, Reference } from './ref'
 import { type Probe, type Result, probe, result } from './result'
-import type { Endpoint, ReqInit, Transport } from './transport'
+import type { ReqInit, Transport } from './transport'
 
 /**
  * @see {@link https://www.typescriptlang.org/docs/handbook/2/conditional-types.html#distributive-conditional-types | Distributive Conditional Types}
@@ -9,7 +10,10 @@ import type { Endpoint, ReqInit, Transport } from './transport'
 // biome-ignore lint/suspicious/noExplicitAny: it has to be
 type DistributiveOmit<T, K extends keyof any> = T extends any ? Omit<T, K> : never
 
-type Ep<R extends string, M extends string> = DistributiveOmit<Extract<Endpoint, { resource: R; method: M }>, 'method' | 'name' | 'resource'>
+type Ep<R extends string, M extends string> = DistributiveOmit<
+	Extract<Endpoint, { resource: R; method: M }>,
+	'method' | 'name' | 'resource'
+>
 
 function makeParams(obj?: Record<string, undefined | string | number>): string {
 	if (obj === undefined) {

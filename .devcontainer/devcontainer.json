@@ -3,6 +3,7 @@
 	"dockerComposeFile": "docker-compose.yaml",
 	"service": "dev",
 	"workspaceFolder": "/workspace",
+	"forwardPorts": ["registry:5000"],
 	"customizations": {
 		"vscode": {
 			"extensions": ["biomejs.biome", "vitest.explorer", "streetsidesoftware.code-spell-checker"]

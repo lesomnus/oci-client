@@ -53,7 +53,7 @@ describe('api v2', () => {
 		// TODO: tags must be in lexical order but `registry` does not comply it.
 		const v = res.unwrap()
 		expect(v.name).to.eq('library/busybox')
-		expect(v.tags).to.eql(['1.36-musl', '1.35-musl', '1.34-musl'])
+		expect(v.tags).to.eql(['1.34-musl', '1.35-musl', '1.36-musl'])
 	})
 	test.concurrent('end-8b', async () => {
 		const req = client.repo(new Ref('library/busybox')).tags.list({
@@ -69,6 +69,6 @@ describe('api v2', () => {
 		const v = res.unwrap()
 		expect(v.name).to.eq('library/busybox')
 		expect(v.tags).to.be.instanceOf(Array)
-		expect(v.tags).to.eql(['1.34-musl'])
+		expect(v.tags).to.eql(['1.36-musl'])
 	})
 })
