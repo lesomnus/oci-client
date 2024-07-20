@@ -14,7 +14,11 @@ export type ErrorResponse = {
 	errors: ErrorEntry[]
 }
 
-export type Result<T extends {}> = ResBase & {
+export type Unwrapped<T> = ResBase & T & As
+
+type Unwrap<T> = {
+	unwrapOr<U>(cb: (res: Response, errors: ErrorEntry[]) => U): Promise<Unwrapped<T> | U>
+
 	/**
 	 * Returns a structured message if the response is not an error,
 	 * but it throws {@link ResError} after invoking `cb` if the response is an error.
@@ -26,12 +30,12 @@ export type Result<T extends {}> = ResBase & {
 	 * const v = res.unwrap(() => { throw new Error('...') }) // throws `Error`
 	 * ```
 	 */
-	unwrap(cb?: (res: Response, errors: ErrorEntry[]) => void): never | Promise<ResBase & T & As>
+	unwrap(cb?: (res: Response, errors: ErrorEntry[]) => void): Promise<Unwrapped<T>> | never
 }
 
-export type Req<T extends {}> = Promise<ResBase & Result<T>> & {
-	unwrap(cb?: (res: Response, errors: ErrorEntry[]) => void): Promise<ResBase & T & As>
-}
+export type Result<T extends {}> = ResBase & Unwrap<T>
+
+export type Req<T extends {}> = Promise<Result<T>> & Result<T>
 
 type As = {
 	/**
@@ -60,7 +64,7 @@ export function result<T extends {}>(req: Promise<Response>, onSuccess: (res: Re
 		return res
 	})
 
-	const unwrap = async (cb?: (res: Response, errors: ErrorEntry[]) => void): Promise<ResBase & T & As> => {
+	const unwrapOr: Unwrap<T>['unwrapOr'] = async <U>(cb: (res: Response, errors: ErrorEntry[]) => U) => {
 		const raw = await req
 		if (raw.status >= 400) {
 			let errors: ErrorEntry[] = []
@@ -68,8 +72,8 @@ export function result<T extends {}>(req: Promise<Response>, onSuccess: (res: Re
 				errors = (await raw.json()).errors
 			}
 
-			cb?.(raw, errors)
-			throw new ResError(raw, 'expected a result but was an error')
+			const v = cb(raw, errors)
+			return v
 		}
 
 		const v = await onSuccess(raw)
@@ -89,8 +93,15 @@ export function result<T extends {}>(req: Promise<Response>, onSuccess: (res: Re
 			},
 		}
 	}
+	const unwrap: Unwrap<T>['unwrap'] = async (cb?: (res: Response, errors: ErrorEntry[]) => void) => {
+		return unwrapOr((raw, errors) => {
+			cb?.(raw, errors)
+			throw new ResError(raw, 'expected a result but was an error')
+		})
+	}
 
-	const rst = req.then(raw => ({ raw, unwrap })) as Req<T>
+	const rst = req.then(raw => ({ raw, unwrapOr, unwrap })) as Req<T>
+	rst.unwrapOr = unwrapOr
 	rst.unwrap = unwrap
 	return rst
 }

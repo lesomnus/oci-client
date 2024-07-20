@@ -12,14 +12,9 @@ services:
       - type: bind
         source: ..
         target: /workspace
-
-  docker:
-    image: library/docker:26-dind
-    command:
-      - --tlsverify=false
-      - --insecure-registry=registry:5000
-
-    privileged: true
+      - type: volume
+        source: registry
+        target: /var/lib/registry
 
   registry:
     image: ghcr.io/project-zot/zot:v2.1.0

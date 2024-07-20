@@ -3,7 +3,7 @@ import { TransportAuthorizer } from './auth'
 import { ResError } from './error'
 import { Ref } from './ref'
 import Patterns from './regexp'
-import { type Result, result } from './result'
+import { result } from './result'
 import { FetchTransport, type Transport, TransportChain, type TransportMiddleware } from './transport'
 
 export type ClientInit = {

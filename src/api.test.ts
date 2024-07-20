@@ -1,7 +1,7 @@
 import { ClientV2 } from './client'
+import Codes from './codes'
 import { Digest } from './digest'
 import { oci } from './media-types'
-import { Ref } from './ref'
 import { Accept, FetchTransport, Unsecure } from './transport'
 
 async function hash(data: Uint8Array): Promise<Digest> {
@@ -12,7 +12,72 @@ async function hash(data: Uint8Array): Promise<Digest> {
 	return new Digest('sha256', v)
 }
 
-describe.concurrent('api v2', () => {
+function title(code: string, method: string, endpoint: string) {
+	return `${code.padEnd('end-NNa'.length)} ${method.padEnd('POST'.length)} ${endpoint}`
+}
+
+type ImageInit = {
+	ref: string
+	data: string
+}
+
+describe.concurrent('api v2', async () => {
+	const images = await Promise.all(
+		(
+			[
+				{
+					ref: 'v0.1.0',
+					data: 'Revenge is a dish best served cold.',
+				},
+				{
+					ref: 'v0.2.0',
+					data: 'Silly Caucasian girl likes to play with Samurai swords',
+				},
+				{
+					ref: 'v0.3.0',
+					data: 'They will be things you will miss',
+				},
+			] as ImageInit[]
+		).map(async init => {
+			const encoder = new TextEncoder()
+			const bytes = encoder.encode(init.data)
+			return {
+				...init,
+				bytes,
+				digest: await hash(bytes),
+			}
+		}),
+	)
+		.then(vs =>
+			vs.map(init => {
+				return {
+					...init,
+					manifest: {
+						schemaVersion: 2,
+						mediaType: oci.image.ManifestV1 as string,
+						config: oci.empty,
+						layers: [
+							{
+								mediaType: 'application/octet-stream',
+								digest: init.digest.toString(),
+								size: init.bytes.byteLength,
+							},
+						],
+					},
+				}
+			}),
+		)
+		.then(vs =>
+			vs.reduce(
+				(o, v) => {
+					o[v.ref] = v
+					return o
+				},
+				{} as Record<string, (typeof vs)[0]>,
+			),
+		)
+
+	const Repo = 'test/test'
 	const Domain = 'registry:5000'
 	const client = new ClientV2(Domain, {
 		transport: [
@@ -24,134 +89,197 @@ describe.concurrent('api v2', () => {
 		],
 	})
 
-	test('end-1   GET', async () => {
+	// Push images:
+	// - test/test:v0.1.0
+	// - test/test:v0.2.0
+	// - test/test:v0.3.0
+	//
+	// All images are Manifest v1.
+	const repo = client.repo(Repo)
+	await repo.blobs.uploads(oci.empty.digest, Uint8Array.from([...'{}'].map(c => c.charCodeAt(0)))).unwrap()
+	for (const image of Object.values(images)) {
+		await repo.blobs.uploads(image.digest, image.bytes).unwrap()
+		await repo.manifests.put(image.ref, oci.image.ManifestV1 as string, JSON.stringify(image.manifest)).unwrap()
+	}
+
+	test(title('end-1', 'GET', '/'), async () => {
 		const req = client.ping()
 		await expect(req).resolves.ok
 
 		const res = await req
 		expect(res.raw.status).to.eq(200)
 	})
-	test('end-2   HEAD blobs/<digest>', async () => {
-		// manifest of library/busybox:1.36-musl for linux/amd64
-		const digest = 'sha256:6d9a2e77c3b19944a28c3922f5715ede91c1ae869d91edf5f6adf88ed54e97cf'
-		const req = client.repo('library/busybox').blobs.exists(digest)
-		await expect(req).resolves.ok
+	describe.concurrent(title('end-2', 'HEAD', 'blobs/<digest>'), () => {
+		test('200', async () => {
+			const { digest } = images['v0.1.0']
+			const req = repo.blobs.exists(digest)
+			await expect(req).resolves.ok
 
-		const res = await req
-		expect(res.raw.status).to.eq(200)
-		expect(res.ok).to.be.true
-	})
-	test('end-2   GET blobs/<digest>', async () => {
-		// manifest of library/busybox:1.36-musl for linux/amd64
-		const digest = 'sha256:6d9a2e77c3b19944a28c3922f5715ede91c1ae869d91edf5f6adf88ed54e97cf'
-		const req = client.repo('library/busybox').blobs.get(digest)
-		await expect(req).resolves.ok
+			const res = await req
+			expect(res.raw.status).to.eq(200)
+			expect(res.ok).to.be.true
+		})
+		test('404', async () => {
+			const req = repo.blobs.exists(await hash(new Uint8Array()))
+			await expect(req).resolves.ok
 
-		const res = await req
-		expect(res.raw.status).to.eq(200)
-
-		const v = (await res.raw.json()) as oci.image.ManifestV1
-		expect(v.layers).to.have.length(1)
-		expect(v.layers[0]).to.eql({
-			mediaType: 'application/vnd.oci.image.layer.v1.tar+gzip',
-			digest: 'sha256:da76cf628912174a928f788a59ff847a686ce63d9a86ca3ece325fbfc8443b99',
-			size: 852608,
+			const res = await req
+			expect(res.raw.status).to.eq(404)
+			expect(res.ok).to.be.false
 		})
 	})
-	test('end-3   GET  manifests/<references>', async () => {
-		const req = client.repo('library/busybox').manifests.get('1.36-musl')
-		await expect(req).resolves.ok
+	describe.concurrent(title('end-2', 'GET', 'blobs/<digest>'), () => {
+		test('200', async () => {
+			const { data, digest } = images['v0.1.0']
+			const req = repo.blobs.get(digest)
+			await expect(req).resolves.ok
 
-		const res = await req
-		expect(res.raw.status).to.eq(200)
+			const res = await req
+			expect(res.raw.status).to.eq(200)
 
-		const result = res.unwrap()
-		await expect(result).resolves.ok
-
-		const opaque = await result
-		expect(opaque.as(oci.image.indexV1)).not.to.be.undefined
-	})
-	test('end-3   HEAD manifests/<references>', async () => {
-		const req = client.repo('library/busybox').manifests.exists('1.36-musl')
-		await expect(req).resolves.ok
-
-		const res = await req
-		expect(res.raw.status).to.eq(200)
-		expect(res.ok).to.be.true
-	})
-	test('end-4b  POST blobs/uploads?digest=_', async () => {
-		const data = crypto.getRandomValues(new Uint8Array(256))
-		const digest = await hash(data)
-
-		const req = client.repo('example/repo').blobs.uploads(digest, data)
-		await expect(req).resolves.ok
-
-		const res = await req
-		expect(res.raw.status).to.eq(201)
-		await expect(res.unwrap()).resolves.ok
-
-		const v = await res.unwrap()
-		expect(v.location).not.to.be.empty
-	})
-	test('end-7   PUT  manifests/<reference>', async () => {
-		const Repo = 'example/end-7'
-		const Ref = 'hello'
-
-		const data = crypto.getRandomValues(new Uint8Array(256))
-		const digest = await hash(data)
-		await client.repo(Repo).blobs.uploads(digest, data)
-		await client.repo(Repo).blobs.uploads(oci.empty.digest, Uint8Array.from([...'{}'].map(c => c.charCodeAt(0))))
-
-		const manifest: oci.image.ManifestV1 = {
-			schemaVersion: 2,
-			mediaType: oci.image.ManifestV1 as string,
-			config: oci.empty,
-			layers: [
-				{
-					mediaType: 'application/octet-stream',
-					digest: digest.toString(),
-					size: data.byteLength,
-				},
-			],
-		}
-
-		const res = await client.repo(Repo).manifests.put(Ref, oci.image.ManifestV1 as string, JSON.stringify(manifest))
-		expect(res.raw.status).to.eq(201)
-		await expect(res.unwrap()).resolves.ok
-
-		const v = await res.unwrap()
-		expect(v.location).not.to.be.empty
-	})
-	test('end-8a  GET  tags/list', async () => {
-		const req = client.repo('library/busybox').tags.list()
-		await expect(req).resolves.ok
-
-		const res = await req
-		expect(res.raw.status).to.eq(200)
-
-		const result = res.unwrap()
-		await expect(result).resolves.ok
-
-		const v = await result
-		expect(v.name).to.eq('library/busybox')
-		expect(v.tags).to.eql(['1.34-musl', '1.35-musl', '1.36-musl'])
-	})
-	test('end-8b  GET  tags/list?n=_&last=_', async () => {
-		const req = client.repo(new Ref('library/busybox')).tags.list({
-			n: 2,
-			last: '1.35-musl',
+			const v = await res.raw.text()
+			expect(v).to.eq(data)
 		})
-		await expect(req).resolves.ok
+		test('404', async () => {
+			const req = repo.blobs.get(await hash(new Uint8Array()))
+			await expect(req).resolves.ok
 
-		const res = await req
-		expect(res.raw.status).to.eq(200)
+			const res = await req
+			expect(res.raw.status).to.eq(404)
 
-		const result = res.unwrap()
-		await expect(result).resolves.ok
+			const errors = await res.unwrapOr((_, errors) => errors)
+			if (!Array.isArray(errors)) expect.unreachable()
+			expect(errors.some(err => err.code === Codes.BlobUnknown)).to.be.true
+		})
+	})
+	describe.concurrent(title('end-3', 'HEAD', 'manifests/<references>'), async () => {
+		test('200', async () => {
+			const { ref } = images['v0.1.0']
+			const req = repo.manifests.exists(ref)
+			await expect(req).resolves.ok
 
-		const v = await result
-		expect(v.name).to.eq('library/busybox')
-		expect(v.tags).to.be.instanceOf(Array)
-		expect(v.tags).to.eql(['1.36-musl'])
+			const res = await req
+			expect(res.raw.status).to.eq(200)
+			expect(res.ok).to.be.true
+		})
+		test('404', async () => {
+			const req = repo.manifests.exists('not exists')
+			await expect(req).resolves.ok
+
+			const res = await req
+			expect(res.raw.status).to.eq(404)
+			expect(res.ok).to.be.false
+		})
+	})
+	describe.concurrent(title('end-3', 'GET', 'manifests/<references>'), () => {
+		test('200', async () => {
+			const { ref, manifest } = images['v0.1.0']
+			const req = repo.manifests.get(ref)
+			await expect(req).resolves.ok
+
+			const res = await req
+			expect(res.raw.status).to.eq(200)
+
+			const result = res.unwrap()
+			await expect(result).resolves.ok
+
+			const v = await result
+			expect(v).containSubset(manifest)
+		})
+		test('404', async () => {
+			const req = repo.manifests.get('not exists')
+			await expect(req).resolves.ok
+
+			const res = await req
+			expect(res.raw.status).to.eq(404)
+
+			const errors = await res.unwrapOr((_, errors) => errors)
+			if (!Array.isArray(errors)) expect.unreachable()
+			expect(errors.some(err => err.code === Codes.ManifestUnknown)).to.be.true
+		})
+	})
+	describe.concurrent(title('end-4b', 'POST', 'blobs/uploads?digest=_'), async () => {
+		test('201', async () => {
+			const { bytes, digest } = images['v0.1.0']
+			const req = client.repo('example/end-4b').blobs.uploads(digest, bytes)
+			await expect(req).resolves.ok
+
+			const res = await req
+			expect(res.raw.status).to.eq(201)
+			await expect(res.unwrap()).resolves.ok
+
+			const v = await res.unwrap()
+			expect(v.location).not.to.be.empty
+		})
+	})
+	describe.concurrent(title('end-7', 'PUT', 'manifests/<reference>'), async () => {
+		test('201', async () => {
+			const { ref, digest, bytes, manifest } = images['v0.1.0']
+			const repo = client.repo('example/end-7')
+			await repo.blobs.uploads(digest, bytes)
+			await repo.blobs.uploads(oci.empty.digest, Uint8Array.from([...'{}'].map(c => c.charCodeAt(0))))
+
+			const res = await repo.manifests.put(ref, manifest.mediaType, JSON.stringify(manifest))
+			expect(res.raw.status).to.eq(201)
+			await expect(res.unwrap()).resolves.ok
+
+			const v = await res.unwrap()
+			expect(v.location).not.to.be.empty
+		})
+	})
+	describe.concurrent(title('end-8a', 'GET', 'tags/list'), async () => {
+		test('200', async () => {
+			const req = repo.tags.list()
+			await expect(req).resolves.ok
+
+			const res = await req
+			expect(res.raw.status).to.eq(200)
+
+			const result = res.unwrap()
+			await expect(result).resolves.ok
+
+			const v = await result
+			expect(v.name).to.eq(Repo)
+			expect(v.tags).to.eql(['v0.1.0', 'v0.2.0', 'v0.3.0'])
+		})
+		test('404', async () => {
+			const req = client.repo('example/not-exists').tags.list()
+			await expect(req).resolves.ok
+
+			const res = await req
+			expect(res.raw.status).to.eq(404)
+
+			const errors = await res.unwrapOr((_, errors) => errors)
+			if (!Array.isArray(errors)) expect.unreachable()
+			expect(errors.some(err => err.code === Codes.NameUnknown)).to.be.true
+		})
+	})
+	describe.concurrent(title('end-8b', 'GET', 'tags/list?n=_&last=_'), async () => {
+		test('200', async () => {
+			const req = repo.tags.list({ n: 2, last: 'v0.2.0' })
+			await expect(req).resolves.ok
+
+			const res = await req
+			expect(res.raw.status).to.eq(200)
+
+			const result = res.unwrap()
+			await expect(result).resolves.ok
+
+			const v = await result
+			expect(v.name).to.eq(Repo)
+			expect(v.tags).to.be.instanceOf(Array)
+			expect(v.tags).to.eql(['v0.3.0'])
+		})
+		test('404', async () => {
+			const req = client.repo('example/not-exists').tags.list({ n: 2, last: 'v0.2.0' })
+			await expect(req).resolves.ok
+
+			const res = await req
+			expect(res.raw.status).to.eq(404)
+
+			const errors = await res.unwrapOr((_, errors) => errors)
+			if (!Array.isArray(errors)) expect.unreachable()
+			expect(errors.some(err => err.code === Codes.NameUnknown)).to.be.true
+		})
 	})
 })

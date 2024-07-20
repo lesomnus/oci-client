@@ -88,4 +88,30 @@ describe('Ref', () => {
 			})
 		})
 	})
+	describe('toString', () => {
+		test.each([
+			{
+				desc: 'name only',
+				ref: 'foo',
+			},
+			{
+				desc: 'with domain',
+				ref: 'localhost:5000/foo',
+			},
+			{
+				desc: 'with tag',
+				ref: 'foo:bar',
+			},
+			{
+				desc: 'with digest',
+				ref: 'foo@bar:baz',
+			},
+			{
+				desc: 'with domain and tag',
+				ref: 'localhost:5000/foo:bar',
+			},
+		])('$desc', ({ ref }) => {
+			expect(Ref.parse(ref).toString()).to.eq(ref)
+		})
+	})
 })
