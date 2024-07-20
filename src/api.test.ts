@@ -54,7 +54,7 @@ describe.concurrent('api v2', async () => {
 					...init,
 					manifest: {
 						schemaVersion: 2,
-						mediaType: oci.image.ManifestV1 as string,
+						mediaType: oci.image.manifestV1 as string,
 						config: oci.empty,
 						layers: [
 							{
@@ -83,7 +83,7 @@ describe.concurrent('api v2', async () => {
 		transport: [
 			new Unsecure(),
 			new Accept({
-				manifests: [oci.image.indexV1],
+				manifests: [oci.image.manifestV1, oci.image.indexV1],
 			}),
 			new FetchTransport(),
 		],
@@ -99,7 +99,7 @@ describe.concurrent('api v2', async () => {
 	await repo.blobs.uploads(oci.empty.digest, Uint8Array.from([...'{}'].map(c => c.charCodeAt(0)))).unwrap()
 	for (const image of Object.values(images)) {
 		await repo.blobs.uploads(image.digest, image.bytes).unwrap()
-		await repo.manifests.put(image.ref, oci.image.ManifestV1 as string, JSON.stringify(image.manifest)).unwrap()
+		await repo.manifests.put(image.ref, oci.image.manifestV1 as string, JSON.stringify(image.manifest)).unwrap()
 	}
 
 	test(title('end-1', 'GET', '/'), async () => {

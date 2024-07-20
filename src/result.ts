@@ -44,11 +44,11 @@ type As = {
 	 *
 	 * @example
 	 * ```ts
-	 * const res = await client
+	 * const opaque = await client
 	 *   .repo('library/node')
-	 *   .manifests.get()
+	 *   .manifests.get().unwrap()
 	 *
-	 * const v = res.unwrap().as(oci.image.indexV1)
+	 * const v = opaque.as(oci.image.indexV1)
 	 * console.log(v.manifests[0].platform.os) // 'linux'
 	 * ```
 	 */

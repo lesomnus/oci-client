@@ -103,5 +103,5 @@ export namespace image {
 		subject?: DescriptorV1
 		annotations?: Record<string, string>
 	}
-	export const ManifestV1 = mediaType<ManifestV1>('application/vnd.oci.image.manifest.v1+json')
+	export const manifestV1 = mediaType<ManifestV1>('application/vnd.oci.image.manifest.v1+json')
 }
