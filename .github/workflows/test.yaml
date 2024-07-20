@@ -32,7 +32,7 @@ jobs:
       - name: Wait registry
         run: |
           for ((i=1; i<=30; i++)); do
-              status_code=$(curl -o /dev/null -s -w "%{http_code}\n" "http://registry:5000/v2/")
+              status_code=$(curl -o /dev/null -s -w "%{http_code}\n" "http://registry:5000/v2/" || true)
               if [ "$status_code" -eq 200 ]; then
                   exit 0
               fi
