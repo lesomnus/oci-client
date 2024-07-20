@@ -78,7 +78,7 @@ describe.concurrent('api v2', async () => {
 		)
 
 	const Repo = 'test/test'
-	const Domain = 'registry:5000'
+	const Domain = process.env.REGISTRY_DOMAIN ?? 'registry:5000'
 	const client = new ClientV2(Domain, {
 		transport: [
 			new Unsecure(),
