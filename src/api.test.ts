@@ -198,7 +198,7 @@ describe.concurrent('api v2', async () => {
 			expect(errors.some(err => err.code === Codes.ManifestUnknown)).to.be.true
 		})
 	})
-	describe.concurrent(title('end-4b', 'POST', 'blobs/uploads?digest=_'), async () => {
+	describe.concurrent(title('end-4b', 'POST', 'blobs/uploads?digest=_'), () => {
 		test('201', async () => {
 			const { bytes, digest } = images['v0.1.0']
 			const req = client.repo('example/end-4b').blobs.uploads(digest, bytes)
@@ -212,7 +212,7 @@ describe.concurrent('api v2', async () => {
 			expect(v.location).not.to.be.empty
 		})
 	})
-	describe.concurrent(title('end-7', 'PUT', 'manifests/<reference>'), async () => {
+	describe.concurrent(title('end-7', 'PUT', 'manifests/<reference>'), () => {
 		test('201', async () => {
 			const { ref, digest, bytes, manifest } = images['v0.1.0']
 			const repo = client.repo('example/end-7')
@@ -227,7 +227,7 @@ describe.concurrent('api v2', async () => {
 			expect(v.location).not.to.be.empty
 		})
 	})
-	describe.concurrent(title('end-8a', 'GET', 'tags/list'), async () => {
+	describe.concurrent(title('end-8a', 'GET', 'tags/list'), () => {
 		test('200', async () => {
 			const req = repo.tags.list()
 			await expect(req).resolves.ok
@@ -254,7 +254,7 @@ describe.concurrent('api v2', async () => {
 			expect(errors.some(err => err.code === Codes.NameUnknown)).to.be.true
 		})
 	})
-	describe.concurrent(title('end-8b', 'GET', 'tags/list?n=_&last=_'), async () => {
+	describe.concurrent(title('end-8b', 'GET', 'tags/list?n=_&last=_'), () => {
 		test('200', async () => {
 			const req = repo.tags.list({ n: 2, last: 'v0.2.0' })
 			await expect(req).resolves.ok
