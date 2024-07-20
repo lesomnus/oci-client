@@ -1,7 +1,7 @@
 import { Digest } from './digest'
 import type { Endpoint } from './endpoint'
 import type { Ref, Reference } from './ref'
-import { type Probe, type Result, probe, result } from './result'
+import { type Probe, type Req, probe, result } from './result'
 import type { ReqInit, Transport } from './transport'
 
 /**
@@ -38,7 +38,7 @@ class ApiBase<R extends string> {
 		return `https://${this.ref.domain}/v2/${this.ref.name}/${this.resource}`
 	}
 
-	protected exec<M extends string>(resource: string, endpoint: Ep<R, M>, init?: ReqInit) {
+	protected exec<M extends string>(resource: string, endpoint: Ep<R, M>, init?: ReqInit): Promise<Response> {
 		return this.transport.fetch(resource, {
 			...init,
 			endpoint: {
@@ -55,9 +55,9 @@ class ApiBase<R extends string> {
 		return probe(raw)
 	}
 
-	protected async _get<T extends {}>(resource: string, endpoint: Ep<R, 'GET'>, init?: ReqInit): Promise<Result<T>> {
-		const raw = await this.exec(resource, endpoint, { ...init, method: 'GET' })
-		return result(raw, () => raw.json())
+	protected _get<T extends {}>(resource: string, endpoint: Ep<R, 'GET'>, init?: ReqInit): Req<T> {
+		const req = this.exec(resource, endpoint, { ...init, method: 'GET' })
+		return result(req, res => res.json())
 	}
 }
 
@@ -96,14 +96,14 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 	 *
 	 * @see {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pulling-blobs | spec} / {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#endpoints | end-2}
 	 */
-	async get(digest: string | Digest) {
+	get(digest: string | Digest) {
 		if (typeof digest === 'string') {
 			digest = Digest.parse(digest)
 		}
 
 		const u = this.#u(digest)
-		const raw = await this.exec(u, { digest }, { method: 'GET' })
-		return result(raw, () => Promise.resolve({}))
+		const req = this.exec(u, { digest }, { method: 'GET' })
+		return result(req, () => Promise.resolve({}))
 	}
 
 	/**
@@ -111,13 +111,9 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 	 *
 	 * @see {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#single-post | spec} / {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#endpoints | end-4b}
 	 */
-	uploads(digest: string | Digest, body: BufferSource | Blob): Promise<Result<BlobsApiV2UploadsRes>>
-	uploads(digest: string | Digest, body: ReadableStream, length: number): Promise<Result<BlobsApiV2UploadsRes>>
-	async uploads(
-		digest: string | Digest,
-		body: BufferSource | Blob | ReadableStream,
-		length?: number,
-	): Promise<Result<BlobsApiV2UploadsRes>> {
+	uploads(digest: string | Digest, body: BufferSource | Blob): Req<BlobsApiV2UploadsRes>
+	uploads(digest: string | Digest, body: ReadableStream, length: number): Req<BlobsApiV2UploadsRes>
+	uploads(digest: string | Digest, body: BufferSource | Blob | ReadableStream, length?: number): Req<BlobsApiV2UploadsRes> {
 		const action = 'uploads'
 		if (typeof digest === 'string') {
 			digest = Digest.parse(digest)
@@ -133,8 +129,7 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 		}
 
 		const u = `${this.urlPrefix}/uploads/?digest=${digest.toString()}`
-
-		const raw = await this.exec<'POST'>(
+		const req = this.exec<'POST'>(
 			u,
 			{ action, digest },
 			{
@@ -146,9 +141,9 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 				body,
 			},
 		)
-		return result(raw, () =>
+		return result(req, res =>
 			Promise.resolve({
-				location: raw.headers.get('Location') as string,
+				location: res.headers.get('Location') as string,
 			}),
 		)
 	}
@@ -197,9 +192,9 @@ export class ManifestsApiV2 extends ApiBase<'manifests'> {
 	 *
 	 * @see {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pushing-manifests | spec} / {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#endpoints | end-7}
 	 */
-	async put(reference: Reference, contentType: string, body: BodyInit, init?: RequestInit) {
+	put(reference: Reference, contentType: string, body: BodyInit, init?: RequestInit) {
 		const u = this.#u(reference)
-		const raw = await this.exec(
+		const req = this.exec(
 			u,
 			{ reference },
 			{
@@ -211,9 +206,10 @@ export class ManifestsApiV2 extends ApiBase<'manifests'> {
 				body,
 			},
 		)
-		return result(raw, () =>
+
+		return result(req, res =>
 			Promise.resolve({
-				location: raw.headers.get('Location') as string,
+				location: res.headers.get('Location') as string,
 			}),
 		)
 	}

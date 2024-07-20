@@ -14,7 +14,24 @@ export type ErrorResponse = {
 	errors: ErrorEntry[]
 }
 
-export type Res<T extends ResBase = ResBase> = ResBase & (T | ErrorResponse)
+export type Result<T extends {}> = ResBase & {
+	/**
+	 * Returns a structured message if the response is not an error,
+	 * but it throws {@link ResError} after invoking `cb` if the response is an error.
+	 *
+	 * @example
+	 * ```ts
+	 * // Assume `res` an error.
+	 * const v = res.unwrap() // throws `ResError`
+	 * const v = res.unwrap(() => { throw new Error('...') }) // throws `Error`
+	 * ```
+	 */
+	unwrap(cb?: (res: Response, errors: ErrorEntry[]) => void): never | Promise<ResBase & T & As>
+}
+
+export type Req<T extends {}> = Promise<ResBase & Result<T>> & {
+	unwrap(cb?: (res: Response, errors: ErrorEntry[]) => void): Promise<ResBase & T & As>
+}
 
 type As = {
 	/**
@@ -34,73 +51,47 @@ type As = {
 	as<U>(mediaType: string | U): undefined | U
 }
 
-export type Result<T extends {} = Res> = ResBase & {
-	/**
-	 * Returns a structured message if the response is not an error,
-	 * but it throws {@link ResError} after invoking `cb` if the response is an error.
-	 *
-	 * @example
-	 * ```ts
-	 * // Assume `res` an error.
-	 * const v = res.unwrap() // throws `ResError`
-	 * const v = res.unwrap(() => { throw new Error('...') }) // throws `Error`
-	 * ```
-	 */
-	unwrap(cb?: (errors: ErrorEntry[]) => void): never | Promise<ResBase & T & As>
-}
+export function result<T extends {}>(req: Promise<Response>, onSuccess: (res: Response) => Promise<T>): Req<T> {
+	req = req.then(res => {
+		if (res.status >= 500) {
+			throw new ResError(res, 'server error')
+		}
 
-export async function result<T extends {}>(raw: Response, onSuccess: () => Promise<T>): Promise<Result<T>> {
-	if (raw.status >= 500) {
-		throw new ResError(raw, 'server error')
-	}
-	if (raw.status >= 400) {
-		let getV: Promise<ErrorEntry[]> | undefined
+		return res
+	})
+
+	const unwrap = async (cb?: (res: Response, errors: ErrorEntry[]) => void): Promise<ResBase & T & As> => {
+		const raw = await req
+		if (raw.status >= 400) {
+			let errors: ErrorEntry[] = []
+			if (raw.headers.get('Content-Type')?.includes('application/json')) {
+				errors = (await raw.json()).errors
+			}
+
+			cb?.(raw, errors)
+			throw new ResError(raw, 'expected a result but was an error')
+		}
+
+		const v = await onSuccess(raw)
 		return {
 			raw,
-			async unwrap(cb) {
-				if (getV === undefined) {
-					const t = raw.headers.get('Content-Type')
-					if (t?.includes('application.json')) {
-						getV = raw.json().then(v => v.errors)
-					} else {
-						getV = Promise.resolve([])
-					}
+			...v,
+			as<U>(mediaType: string | U) {
+				const t = raw.headers.get('Content-Type')
+				if (t !== null && t === mediaType) {
+					return v as unknown as U
+				}
+				if ('mediaType' in v && v.mediaType === mediaType) {
+					return v as unknown as U
 				}
 
-				const errors = await getV
-				cb?.(errors)
-				throw new ResError(raw, 'expected a result but was an error')
+				return undefined
 			},
 		}
 	}
 
-	let getV: Promise<T> | undefined
-	const rst = {
-		raw,
-		async unwrap() {
-			if (getV === undefined) {
-				getV = onSuccess()
-			}
-
-			const v = await getV
-			return {
-				raw,
-				...v,
-				as<U>(mediaType: string | U): undefined | U {
-					const t = this.raw.headers.get('Content-Type')
-					if (t !== null && t === mediaType) {
-						return v as unknown as U
-					}
-					if ('mediaType' in v && v.mediaType === mediaType) {
-						return v as unknown as U
-					}
-
-					return undefined
-				},
-			}
-		},
-	}
-
+	const rst = req.then(raw => ({ raw, unwrap })) as Req<T>
+	rst.unwrap = unwrap
 	return rst
 }
 

@@ -64,9 +64,11 @@ describe.concurrent('api v2', () => {
 
 		const res = await req
 		expect(res.raw.status).to.eq(200)
-		await expect(res.unwrap()).resolves.ok
 
-		const opaque = await res.unwrap()
+		const result = res.unwrap()
+		await expect(result).resolves.ok
+
+		const opaque = await result
 		expect(opaque.as(oci.image.indexV1)).not.to.be.undefined
 	})
 	test('end-3   HEAD manifests/<references>', async () => {
@@ -126,9 +128,11 @@ describe.concurrent('api v2', () => {
 
 		const res = await req
 		expect(res.raw.status).to.eq(200)
-		await expect(res.unwrap()).resolves.ok
 
-		const v = await res.unwrap()
+		const result = res.unwrap()
+		await expect(result).resolves.ok
+
+		const v = await result
 		expect(v.name).to.eq('library/busybox')
 		expect(v.tags).to.eql(['1.34-musl', '1.35-musl', '1.36-musl'])
 	})
@@ -141,9 +145,11 @@ describe.concurrent('api v2', () => {
 
 		const res = await req
 		expect(res.raw.status).to.eq(200)
-		await expect(res.unwrap()).resolves.ok
 
-		const v = await res.unwrap()
+		const result = res.unwrap()
+		await expect(result).resolves.ok
+
+		const v = await result
 		expect(v.name).to.eq('library/busybox')
 		expect(v.tags).to.be.instanceOf(Array)
 		expect(v.tags).to.eql(['1.36-musl'])

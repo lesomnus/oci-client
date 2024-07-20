@@ -44,13 +44,14 @@ export class ClientV2 {
 	 *
 	 * @see end-1
 	 */
-	async ping(): Promise<Result> {
+	ping() {
 		const u = `https://${this.domain}/v2/`
-
-		const raw = await this.transport.fetch(u)
-		if (raw.status !== 200) {
+		const res = this.transport.fetch(u).then(res => {
 			let msg = 'unknown server response'
-			switch (raw.status) {
+			switch (res.status) {
+				case 200:
+					return res
+
 				case 401:
 					msg = 'unauthorized'
 					break
@@ -60,10 +61,9 @@ export class ClientV2 {
 					break
 			}
 
-			throw new ResError(raw, msg)
-		}
-
-		return result(raw, () => Promise.resolve({}))
+			throw new ResError(res, msg)
+		})
+		return result(res, () => Promise.resolve({}))
 	}
 
 	repo(ref: string | Ref): RepoV2 {

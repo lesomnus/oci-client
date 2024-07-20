@@ -21,8 +21,8 @@ import { ClientV2 } from '@lesomns/oci-client'
 const client = new ClientV2('index.docker.io')
 await client.ping()
 
-const res = await client.repo('library/node').tags.list()
-console.log(res.unwrap())
+const v = await client.repo('library/node').tags.list().unwrap()
+console.log(v)
 // {
 //   "name": "library/node",
 //   "tags": [
@@ -39,9 +39,9 @@ import { oci } from '@lesomnus/oci-client/media-types'
 const client = new ClientV2('index.docker.io')
 await client.ping()
 
-const res = await client.repo('library/node').manifests.get('latest')
-const index = res.unwrap().as(oci.image.indexV1)
-console.log(index.manifests[0].platform.os)
+const opaque = await client.repo('library/node').manifests.get('latest').unwrap()
+const index = opaque.as(oci.image.indexV1)
+console.log(index?.manifests[0].platform.os)
 // "linux"
 ```
 
