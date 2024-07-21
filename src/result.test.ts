@@ -1,4 +1,5 @@
 import { ResError } from './error'
+import { oci } from './media-types'
 import { type ErrorResponse, result } from './result'
 
 describe('result', () => {
@@ -75,6 +76,20 @@ describe('result', () => {
 			})
 			await expect(rst).rejects.toThrowError(ResError)
 			expect(touched).to.be.true
+		})
+	})
+	describe('as', () => {
+		it('returns value with type if the media type matches', async () => {
+			const res = new Response(null, {
+				status: 200,
+				headers: {
+					'Content-Type': oci.image.indexV1,
+				},
+			})
+			const req = Promise.resolve(res)
+			const rst = result(req, () => Promise.resolve({ n: 42 })).unwrap()
+			const opaque = await rst
+			expectTypeOf(opaque.as(oci.image.indexV1)).toEqualTypeOf<oci.image.IndexV1 | undefined>()
 		})
 	})
 })

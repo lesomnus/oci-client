@@ -1,4 +1,4 @@
-import { mediaType } from '../media-type'
+import { type MediaType, mediaType } from '../media-type'
 
 /**
  * @see {@link https://github.com/opencontainers/image-spec/blob/main/manifest.md#guidance-for-an-empty-descriptor | Guidance for an Empty Descriptor}
@@ -13,8 +13,8 @@ export const empty: DescriptorV1 = {
 /**
  * @see {@link https://github.com/opencontainers/image-spec/blob/main/descriptor.md | spec}
  */
-export type DescriptorV1 = {
-	mediaType: string
+export type DescriptorV1<M extends MediaType = string> = {
+	mediaType: M
 	digest: string
 	size: number
 	urls?: number[]
@@ -27,15 +27,12 @@ export namespace image {
 	/**
 	 * @see  {@link https://github.com/opencontainers/image-spec/blob/main/image-index.md | spec}
 	 */
-	export type IndexV1 = {
+	export type IndexV1<M extends MediaType = (string & {}) | typeof manifestV1> = {
 		schemaVersion: number
-		mediaType: 'application/vnd.oci.image.index.v1+json'
+		mediaType: typeof indexV1
 		artifactType?: string
-		manifests: (Omit<DescriptorV1, 'mediaType'> & {
-			mediaType:
-				| (string & {}) //
-				| 'application/vnd.oci.image.manifest.v1+json'
-			platform: {
+		manifests: (DescriptorV1<M> & {
+			platform?: {
 				architecture:
 					| (string & {})
 					| '386'
@@ -76,7 +73,7 @@ export namespace image {
 		subject?: DescriptorV1
 		annotations?: Record<string, string>
 	}
-	export const indexV1 = mediaType<IndexV1>('application/vnd.oci.image.index.v1+json')
+	export const indexV1 = mediaType({} as IndexV1, 'application/vnd.oci.image.index.v1+json')
 
 	/**
 	 * @see {@link https://github.com/opencontainers/image-spec/blob/main/manifest.md | spec}
@@ -89,19 +86,18 @@ export namespace image {
 		 * This field MAY be removed in a future version of the specification.
 		 */
 		schemaVersion: (number & {}) & 2
-		mediaType: (string & {}) | 'application/vnd.oci.image.manifest.v1+json'
+		mediaType: typeof manifestV1
 		artifactType?: string
 		config: DescriptorV1
-		layers: (Omit<DescriptorV1, 'mediaType'> & {
-			mediaType:
-				| (string & {})
-				| 'application/vnd.oci.image.layer.v1.tar'
-				| 'application/vnd.oci.image.layer.v1.tar+gzip'
-				| 'application/vnd.oci.image.layer.nondistributable.v1.tar'
-				| 'application/vnd.oci.image.layer.nondistributable.v1.tar+gzip'
-		})[]
-		subject?: DescriptorV1
+		layers: DescriptorV1<
+			| (string & {})
+			| 'application/vnd.oci.image.layer.v1.tar'
+			| 'application/vnd.oci.image.layer.v1.tar+gzip'
+			| 'application/vnd.oci.image.layer.nondistributable.v1.tar'
+			| 'application/vnd.oci.image.layer.nondistributable.v1.tar+gzip'
+		>[]
+		subject?: DescriptorV1<(string & {}) | typeof manifestV1>
 		annotations?: Record<string, string>
 	}
-	export const manifestV1 = mediaType<ManifestV1>('application/vnd.oci.image.manifest.v1+json')
+	export const manifestV1 = mediaType({} as ManifestV1, 'application/vnd.oci.image.manifest.v1+json')
 }

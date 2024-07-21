@@ -1,4 +1,5 @@
 import { ResError } from './error'
+import type { MediaType } from './media-type'
 
 type ResBase = {
 	raw: Response
@@ -52,7 +53,7 @@ type As = {
 	 * console.log(v.manifests[0].platform.os) // 'linux'
 	 * ```
 	 */
-	as<U>(mediaType: string | U): undefined | U
+	as<T, S extends string>(mediaType: MediaType<T, S>): T | undefined
 }
 
 export function result<T extends {}>(req: Promise<Response>, onSuccess: (res: Response) => Promise<T>): Req<T> {
@@ -80,13 +81,13 @@ export function result<T extends {}>(req: Promise<Response>, onSuccess: (res: Re
 		return {
 			raw,
 			...v,
-			as<U>(mediaType: string | U) {
+			as<T, S extends string>(mediaType: MediaType<T, S>) {
 				const t = raw.headers.get('Content-Type')
 				if (t !== null && t === mediaType) {
-					return v as unknown as U
+					return v as unknown as T
 				}
 				if ('mediaType' in v && v.mediaType === mediaType) {
-					return v as unknown as U
+					return v as unknown as T
 				}
 
 				return undefined

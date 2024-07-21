@@ -1,81 +1,103 @@
+import { createHash } from 'node:crypto'
+
 import { ClientV2 } from './client'
 import Codes from './codes'
 import { Digest } from './digest'
 import { oci } from './media-types'
 import { Accept, FetchTransport, Unsecure } from './transport'
 
-async function hash(data: Uint8Array): Promise<Digest> {
-	const v = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', data)))
-		.map(b => b.toString(16).padStart(2, '0'))
-		.join('')
+function encodeString(data: string): Uint8Array {
+	const encoder = new TextEncoder()
+	return encoder.encode(data)
+}
+
+function hash(data: Uint8Array): Digest {
+	const sha256 = createHash('sha256')
+	sha256.update(data)
+	const v = sha256.digest('hex')
 
 	return new Digest('sha256', v)
 }
 
 function title(code: string, method: string, endpoint: string) {
-	return `${code.padEnd('end-NNa'.length)} ${method.padEnd('POST'.length)} ${endpoint}`
+	return `${code.padEnd('end-NNa'.length)} ${method.padStart('DELETE'.length)} ${endpoint}`
 }
 
-type ImageInit = {
-	ref: string
-	data: string
+function toRecord<T extends { key: string }>(vs: T[]) {
+	return vs.reduce(
+		(o, { key, ...v }) => {
+			o[key] = v
+			return o
+		},
+		{} as Record<string, Omit<T, 'key'>>,
+	)
 }
 
 describe.concurrent('api v2', async () => {
-	const images = await Promise.all(
-		(
-			[
-				{
-					ref: 'v0.1.0',
-					data: 'Revenge is a dish best served cold.',
-				},
-				{
-					ref: 'v0.2.0',
-					data: 'Silly Caucasian girl likes to play with Samurai swords',
-				},
-				{
-					ref: 'v0.3.0',
-					data: 'They will be things you will miss',
-				},
-			] as ImageInit[]
-		).map(async init => {
-			const encoder = new TextEncoder()
-			const bytes = encoder.encode(init.data)
+	const images = toRecord(
+		[
+			{
+				key: 'v0.1.0',
+				data: 'Revenge is a dish best served cold.',
+			},
+			{
+				key: 'v0.2.0',
+				data: 'Silly Caucasian girl likes to play with Samurai swords',
+			},
+			{
+				key: 'v0.3.0',
+				data: 'They will be things you will miss',
+			},
+		].map(init => {
+			const bytes = encodeString(init.data)
+			const digest = hash(bytes)
 			return {
 				...init,
+				ref: init.key,
 				bytes,
-				digest: await hash(bytes),
+				digest: hash(bytes),
+				manifest: {
+					schemaVersion: 2,
+					mediaType: oci.image.manifestV1,
+					config: oci.empty,
+					layers: [
+						{
+							mediaType: 'application/octet-stream',
+							digest: digest.toString(),
+							size: bytes.byteLength,
+						},
+					],
+				},
 			}
 		}),
 	)
-		.then(vs =>
-			vs.map(init => {
-				return {
-					...init,
-					manifest: {
-						schemaVersion: 2,
-						mediaType: oci.image.manifestV1 as string,
-						config: oci.empty,
-						layers: [
-							{
-								mediaType: 'application/octet-stream',
-								digest: init.digest.toString(),
-								size: init.bytes.byteLength,
-							},
-						],
-					},
-				}
-			}),
-		)
-		.then(vs =>
-			vs.reduce(
-				(o, v) => {
-					o[v.ref] = v
-					return o
-				},
-				{} as Record<string, (typeof vs)[0]>,
-			),
-		)
+	const artifacts = toRecord(
+		['application/foo', 'application/bar'].map(key => {
+			const manifest: oci.image.ManifestV1 = {
+				schemaVersion: 2,
+				mediaType: oci.image.manifestV1,
+				artifactType: key,
+				config: oci.empty,
+				layers: [oci.empty],
+				subject: (() => {
+					const {
+						bytes,
+						digest,
+						manifest: { mediaType },
+					} = images['v0.1.0']
+					return {
+						mediaType,
+						digest: digest.toString(),
+						size: bytes.length,
+					}
+				})(),
+			}
+			const bytes = encodeString(JSON.stringify(manifest))
+			const digest = hash(bytes)
+
+			return { key, bytes, digest, manifest }
+		}),
+	)
 
 	const Repo = 'test/test'
 	const Domain = process.env.REGISTRY_DOMAIN ?? 'registry:5000'
@@ -99,7 +121,10 @@ describe.concurrent('api v2', async () => {
 	await repo.blobs.uploads(oci.empty.digest, Uint8Array.from([...'{}'].map(c => c.charCodeAt(0)))).unwrap()
 	for (const image of Object.values(images)) {
 		await repo.blobs.uploads(image.digest, image.bytes).unwrap()
-		await repo.manifests.put(image.ref, oci.image.manifestV1 as string, JSON.stringify(image.manifest)).unwrap()
+		await repo.manifests.put(image.ref, oci.image.manifestV1, JSON.stringify(image.manifest)).unwrap()
+	}
+	for (const artifact of Object.values(artifacts)) {
+		await repo.manifests.put(artifact.digest, oci.image.manifestV1, artifact.bytes).unwrap()
 	}
 
 	test(title('end-1', 'GET', '/'), async () => {
@@ -198,6 +223,19 @@ describe.concurrent('api v2', async () => {
 			expect(errors.some(err => err.code === Codes.ManifestUnknown)).to.be.true
 		})
 	})
+	describe.concurrent(title('end-4a', 'POST', 'blobs/uploads'), () => {
+		test('202', async () => {
+			const req = client.repo('test/end-4a').blobs.uploadsInit()
+			await expect(req).resolves.ok
+
+			const res = await req
+			expect(res.raw.status).to.eq(202)
+			await expect(res.unwrap()).resolves.ok
+
+			const v = await res.unwrap()
+			expect(v.location).not.to.be.empty
+		})
+	})
 	describe.concurrent(title('end-4b', 'POST', 'blobs/uploads?digest=_'), () => {
 		test('201', async () => {
 			const { bytes, digest } = images['v0.1.0']
@@ -243,7 +281,7 @@ describe.concurrent('api v2', async () => {
 			expect(v.tags).to.eql(['v0.1.0', 'v0.2.0', 'v0.3.0'])
 		})
 		test('404', async () => {
-			const req = client.repo('example/not-exists').tags.list()
+			const req = client.repo('test/end-8a-not-exists').tags.list()
 			await expect(req).resolves.ok
 
 			const res = await req
@@ -271,7 +309,7 @@ describe.concurrent('api v2', async () => {
 			expect(v.tags).to.eql(['v0.3.0'])
 		})
 		test('404', async () => {
-			const req = client.repo('example/not-exists').tags.list({ n: 2, last: 'v0.2.0' })
+			const req = client.repo('test/end-8b-not-exists').tags.list({ n: 2, last: 'v0.2.0' })
 			await expect(req).resolves.ok
 
 			const res = await req
@@ -280,6 +318,118 @@ describe.concurrent('api v2', async () => {
 			const errors = await res.unwrapOr((_, errors) => errors)
 			if (!Array.isArray(errors)) expect.unreachable()
 			expect(errors.some(err => err.code === Codes.NameUnknown)).to.be.true
+		})
+	})
+	describe.concurrent(title('end-9', 'DELETE', 'manifests/<reference>'), () => {
+		test('202', async () => {
+			const repo = client.repo('test/end-9')
+			const image = images['v0.1.0']
+			const { manifest } = image
+			await repo.blobs.uploads(oci.empty.digest, Uint8Array.from([...'{}'].map(c => c.charCodeAt(0)))).unwrap()
+			await repo.blobs.uploads(image.digest, image.bytes).unwrap()
+
+			const bytes = encodeString(JSON.stringify(manifest))
+			const digest = hash(bytes)
+			await repo.manifests.put(digest, oci.image.manifestV1, JSON.stringify(image.manifest)).unwrap()
+
+			const req = repo.manifests.delete(digest)
+			await expect(req).resolves.ok
+
+			const res = await req
+			expect(res.raw.status).to.eq(202)
+
+			const result = res.unwrap()
+			await expect(result).resolves.ok
+		})
+		test('404', async () => {
+			const digest = hash(new Uint8Array())
+			const req = repo.manifests.delete(digest)
+			await expect(req).resolves.ok
+
+			const res = await req
+			expect(res.raw.status).to.eq(404)
+		})
+	})
+	describe.concurrent(title('end-10', 'DELETE', 'blobs/<digest>'), () => {
+		test('202', async () => {
+			const repo = client.repo('test/end-10')
+			const { digest, bytes } = images['v0.1.0']
+			await repo.blobs.uploads(digest, bytes).unwrap()
+
+			const req = repo.blobs.delete(digest)
+			await expect(req).resolves.ok
+
+			const res = await req
+			expect(res.raw.status).to.eq(202)
+
+			const result = res.unwrap()
+			await expect(result).resolves.ok
+		})
+		test('404', async () => {
+			const digest = hash(new Uint8Array())
+			const req = repo.blobs.delete(digest)
+			await expect(req).resolves.ok
+
+			const res = await req
+			expect(res.raw.status).to.eq(404)
+		})
+	})
+	describe.concurrent(title('end-12a', 'GET', 'referrers/<digest>'), () => {
+		test('200', async () => {
+			const { digest } = images['v0.1.0']
+			const req = repo.referrers.get(digest)
+			await expect(req).resolves.ok
+
+			const res = await req
+			expect(res.raw.status).to.eq(200)
+
+			const result = res.unwrap()
+			await expect(result).resolves.ok
+
+			const v = await result
+			const compare = <T extends (typeof v.manifests)[0]>(a: T, b: T) => a.mediaType.localeCompare(b.mediaType)
+
+			expect(v.manifests).to.be.lengthOf(2)
+			expect(v.manifests.sort(compare)).to.deep.equals(
+				Object.values(artifacts)
+					.map(v => ({
+						mediaType: v.manifest.mediaType,
+						digest: v.digest.toString(),
+						size: v.bytes.length,
+						artifactType: v.manifest.artifactType,
+					}))
+					.sort(compare),
+			)
+		})
+		test('400', async () => {
+			const req = repo.referrers.get('foo')
+			await expect(req).resolves.ok
+
+			const res = await req
+			expect(res.raw.status).to.eq(400)
+		})
+	})
+	describe.concurrent(title('end-12b', 'GET', 'referrers/<digest>?artifactType=_'), () => {
+		test('200', async () => {
+			const { digest } = images['v0.1.0']
+			const artifact = artifacts['application/foo']
+			const req = repo.referrers.get(digest, { artifactType: artifact.manifest.artifactType })
+			await expect(req).resolves.ok
+
+			const res = await req
+			expect(res.raw.status).to.eq(200)
+
+			const result = res.unwrap()
+			await expect(result).resolves.ok
+
+			const v = await result
+			expect(v.manifests).to.be.lengthOf(1)
+			expect(v.manifests[0]).to.deep.equals({
+				mediaType: artifact.manifest.mediaType,
+				digest: artifact.digest.toString(),
+				size: artifact.bytes.length,
+				artifactType: artifact.manifest.artifactType,
+			})
 		})
 	})
 })

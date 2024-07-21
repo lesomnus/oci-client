@@ -1,8 +1,10 @@
 import { Digest } from './digest'
 import type { Endpoint } from './endpoint'
+import type { MediaType } from './media-type'
+import type { oci } from './media-types'
 import type { Ref, Reference } from './ref'
 import { type Probe, type Req, probe, result } from './result'
-import type { ReqInit, Transport } from './transport'
+import type { Transport } from './transport'
 
 /**
  * @see {@link https://www.typescriptlang.org/docs/handbook/2/conditional-types.html#distributive-conditional-types | Distributive Conditional Types}
@@ -38,7 +40,7 @@ class ApiBase<R extends string> {
 		return `https://${this.ref.domain}/v2/${this.ref.name}/${this.resource}`
 	}
 
-	protected exec<M extends string>(resource: string, endpoint: Ep<R, M>, init?: ReqInit): Promise<Response> {
+	protected exec<M extends string>(resource: string, endpoint: Ep<R, M>, init?: RequestInit): Promise<Response> {
 		return this.transport.fetch(resource, {
 			...init,
 			endpoint: {
@@ -50,15 +52,24 @@ class ApiBase<R extends string> {
 		})
 	}
 
-	protected async _head(resource: string, endpoint: Ep<R, 'HEAD'>, init?: ReqInit): Promise<Probe> {
+	protected async _head(resource: string, endpoint: Ep<R, 'HEAD'>, init?: RequestInit): Promise<Probe> {
 		const raw = await this.exec(resource, endpoint, { ...init, method: 'HEAD' })
 		return probe(raw)
 	}
 
-	protected _get<T extends {}>(resource: string, endpoint: Ep<R, 'GET'>, init?: ReqInit): Req<T> {
+	protected _get<T extends {}>(resource: string, endpoint: Ep<R, 'GET'>, init?: RequestInit): Req<T> {
 		const req = this.exec(resource, endpoint, { ...init, method: 'GET' })
 		return result(req, res => res.json())
 	}
+
+	protected _delete<T extends {}>(resource: string, endpoint: Ep<R, 'DELETE'>, init?: RequestInit): Req<T> {
+		const req = this.exec(resource, endpoint, { ...init, method: 'DELETE' })
+		return result(req, res => Promise.resolve({}))
+	}
+}
+
+export type BlobsApiV2UploadsInitRes = {
+	location: string
 }
 
 export type BlobsApiV2UploadsRes = {
@@ -106,8 +117,18 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 		return result(req, () => Promise.resolve({}))
 	}
 
+	uploadsInit(): Req<BlobsApiV2UploadsInitRes> {
+		const u = `${this.urlPrefix}/uploads/`
+		const req = this.exec<'POST'>(u, { action: 'uploads' }, { method: 'POST' })
+		return result(req, res =>
+			Promise.resolve({
+				location: res.headers.get('Location') as string,
+			}),
+		)
+	}
+
 	/**
-	 * Push a blob monolithically by using a single POST request.
+	 * Push a blob by using a single POST request.
 	 *
 	 * @see {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#single-post | spec} / {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#endpoints | end-4b}
 	 */
@@ -146,6 +167,11 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 				location: res.headers.get('Location') as string,
 			}),
 		)
+	}
+
+	delete(digest: Digest) {
+		const u = this.#u(digest)
+		return this._delete(u, { digest })
 	}
 }
 
@@ -192,7 +218,7 @@ export class ManifestsApiV2 extends ApiBase<'manifests'> {
 	 *
 	 * @see {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pushing-manifests | spec} / {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#endpoints | end-7}
 	 */
-	put(reference: Reference, contentType: string, body: BodyInit, init?: RequestInit) {
+	put(reference: Reference, contentType: MediaType, body: BodyInit, init?: RequestInit) {
 		const u = this.#u(reference)
 		const req = this.exec(
 			u,
@@ -212,6 +238,46 @@ export class ManifestsApiV2 extends ApiBase<'manifests'> {
 				location: res.headers.get('Location') as string,
 			}),
 		)
+	}
+
+	delete(reference: Reference) {
+		const u = this.#u(reference)
+		return this._delete(u, { reference })
+	}
+}
+
+export type ReferrersApiV2GetOpts = {
+	artifactType?: string
+}
+export type ReferrersApiV2GetRes = oci.image.IndexV1<
+	| typeof oci.image.indexV1 //
+	| typeof oci.image.manifestV1
+>
+
+export class ReferrersApiV2 extends ApiBase<'referrers'> {
+	constructor(
+		readonly transport: Transport,
+		readonly ref: Ref,
+	) {
+		super(transport, ref, 'referrers')
+	}
+
+	#u(digest: Digest) {
+		return `${this.urlPrefix}/${digest.toString()}`
+	}
+
+	/**
+	 * Fetch the list of referrers identified by digest.
+	 *
+	 * @see {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#listing-referrers | spec} / {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#endpoints | end-12}
+	 */
+	get(digest: string | Digest, opts?: ReferrersApiV2GetOpts): Req<ReferrersApiV2GetRes> {
+		if (typeof digest === 'string') {
+			digest = Digest.parse(digest)
+		}
+
+		const u = `${this.#u(digest)}${makeParams(opts)}`
+		return this._get(u, { ...opts })
 	}
 }
 
@@ -256,6 +322,10 @@ export class RepoV2 {
 
 	get manifests(): ManifestsApiV2 {
 		return new ManifestsApiV2(this.transport, this.ref)
+	}
+
+	get referrers(): ReferrersApiV2 {
+		return new ReferrersApiV2(this.transport, this.ref)
 	}
 
 	get tags(): TagsApiV2 {

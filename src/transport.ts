@@ -112,7 +112,7 @@ export class Accept implements TransportMiddleware {
 	}: {
 		manifests?: MediaType[]
 	}) {
-		this.#manifests = manifests?.map(v => `${v}`).join(', ') ?? ''
+		this.#manifests = manifests?.join(', ') ?? ''
 	}
 
 	fetch(resource: RequestInfo | URL, init: ReqInit | undefined, next: Transport): Promise<Response> {
