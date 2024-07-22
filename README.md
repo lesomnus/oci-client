@@ -58,8 +58,8 @@ Highlighted methods are currently implemented.
 | end-3   | `GET` / `HEAD` | /v2/\<name\>/manifests/\<reference\>                             |
 | end-4a  | `POST`           | /v2/\<name\>/blobs/uploads/                                      |
 | end-4b  | `POST`           | /v2/\<name\>/blobs/uploads/?digest=\<digest\>                    |
-| end-5   | PATCH          | /v2/\<name\>/blobs/uploads/\<reference\>                         |
-| end-6   | PUT            | /v2/\<name\>/blobs/uploads/\<reference\>?digest=\<digest\>       |
+| end-5   | `PATCH`          | /v2/\<name\>/blobs/uploads/\<reference\>                         |
+| end-6   | `PUT`            | /v2/\<name\>/blobs/uploads/\<reference\>?digest=\<digest\>       |
 | end-7   | `PUT`            | /v2/\<name\>/manifests/\<reference\>                             |
 | end-8a  | `GET`          | /v2/\<name\>/tags/list                                           |
 | end-8b  | `GET`          | /v2/\<name\>/tags/list?n=\<integer\>&last=\<tagname\>            |

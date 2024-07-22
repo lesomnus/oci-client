@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 
+import { Chunk } from './chunk'
 import { ClientV2 } from './client'
 import Codes from './codes'
 import { Digest } from './digest'
@@ -34,6 +35,7 @@ function toRecord<T extends { key: string }>(vs: T[]) {
 }
 
 describe.concurrent('api v2', async () => {
+	const emptyObjectData = new Chunk(Uint8Array.from([...'{}'].map(c => c.charCodeAt(0))))
 	const images = toRecord(
 		[
 			{
@@ -55,6 +57,7 @@ describe.concurrent('api v2', async () => {
 				...init,
 				ref: init.key,
 				bytes,
+				chunk: new Chunk(bytes),
 				digest: hash(bytes),
 				manifest: {
 					schemaVersion: 2,
@@ -118,9 +121,9 @@ describe.concurrent('api v2', async () => {
 	//
 	// All images are Manifest v1.
 	const repo = client.repo(Repo)
-	await repo.blobs.uploads(oci.empty.digest, Uint8Array.from([...'{}'].map(c => c.charCodeAt(0)))).unwrap()
+	await repo.blobs.uploads(oci.empty.digest, emptyObjectData).unwrap()
 	for (const image of Object.values(images)) {
-		await repo.blobs.uploads(image.digest, image.bytes).unwrap()
+		await repo.blobs.uploads(image.digest, image.chunk).unwrap()
 		await repo.manifests.put(image.ref, oci.image.manifestV1, JSON.stringify(image.manifest)).unwrap()
 	}
 	for (const artifact of Object.values(artifacts)) {
@@ -225,7 +228,7 @@ describe.concurrent('api v2', async () => {
 	})
 	describe.concurrent(title('end-4a', 'POST', 'blobs/uploads'), () => {
 		test('202', async () => {
-			const req = client.repo('test/end-4a').blobs.uploadsInit()
+			const req = client.repo('test/end-4a').blobs.uploadInit()
 			await expect(req).resolves.ok
 
 			const res = await req
@@ -233,13 +236,14 @@ describe.concurrent('api v2', async () => {
 			await expect(res.unwrap()).resolves.ok
 
 			const v = await res.unwrap()
-			expect(v.location).not.to.be.empty
+			expect(v.location).to.be.exist
 		})
 	})
 	describe.concurrent(title('end-4b', 'POST', 'blobs/uploads?digest=_'), () => {
 		test('201', async () => {
-			const { bytes, digest } = images['v0.1.0']
-			const req = client.repo('example/end-4b').blobs.uploads(digest, bytes)
+			const { chunk, digest } = images['v0.1.0']
+
+			const req = client.repo('example/end-4b').blobs.uploads(digest, chunk)
 			await expect(req).resolves.ok
 
 			const res = await req
@@ -247,15 +251,64 @@ describe.concurrent('api v2', async () => {
 			await expect(res.unwrap()).resolves.ok
 
 			const v = await res.unwrap()
-			expect(v.location).not.to.be.empty
+			expect(v.location).to.be.exist
+		})
+	})
+	describe.concurrent(title('end-5', 'PATCH', 'blobs/uploads/<reference>'), () => {
+		test('202', async () => {
+			const { chunk } = images['v0.1.0']
+			const repo = client.repo('test/end-5')
+			const { location } = await repo.blobs.uploadInit().unwrap()
+
+			const req = repo.blobs.uploadChunk(location, chunk)
+			await expect(req).resolves.ok
+
+			const res = await req
+			expect(res.raw.status).to.eq(202)
+			await expect(res.unwrap()).resolves.ok
+
+			const v = await res.unwrap()
+			expect(v.location).to.be.exist
+		})
+		test('416', async () => {
+			const { chunk } = images['v0.1.0']
+			const repo = client.repo('test/end-5')
+			const { location } = await repo.blobs.uploadInit().unwrap()
+
+			const req = repo.blobs.uploadChunk(location, chunk.withPos(1))
+			await expect(req).resolves.ok
+
+			const res = await req
+			expect(res.raw.status).to.eq(416)
+
+			const errors = await res.unwrapOr((_, errors) => errors)
+			if (!Array.isArray(errors)) expect.unreachable()
+			expect(errors.some(err => err.code === Codes.BlobUploadInvalid)).to.be.true
+		})
+	})
+	describe.concurrent(title('end-6', 'PUT', 'blobs/uploads/<reference>?digest=_'), () => {
+		test('201', async () => {
+			const { chunk, digest } = images['v0.1.0']
+			const repo = client.repo('test/end-6')
+			const { location } = await repo.blobs.uploadInit().unwrap()
+
+			const req = repo.blobs.uploadClose(location, digest, chunk)
+			await expect(req).resolves.ok
+
+			const res = await req
+			expect(res.raw.status).to.eq(201)
+			await expect(res.unwrap()).resolves.ok
+
+			const v = await res.unwrap()
+			expect(v.location).to.be.exist
 		})
 	})
 	describe.concurrent(title('end-7', 'PUT', 'manifests/<reference>'), () => {
 		test('201', async () => {
-			const { ref, digest, bytes, manifest } = images['v0.1.0']
+			const { ref, digest, chunk, manifest } = images['v0.1.0']
 			const repo = client.repo('example/end-7')
-			await repo.blobs.uploads(digest, bytes)
-			await repo.blobs.uploads(oci.empty.digest, Uint8Array.from([...'{}'].map(c => c.charCodeAt(0))))
+			await repo.blobs.uploads(digest, chunk)
+			await repo.blobs.uploads(oci.empty.digest, emptyObjectData)
 
 			const res = await repo.manifests.put(ref, manifest.mediaType, JSON.stringify(manifest))
 			expect(res.raw.status).to.eq(201)
@@ -325,8 +378,8 @@ describe.concurrent('api v2', async () => {
 			const repo = client.repo('test/end-9')
 			const image = images['v0.1.0']
 			const { manifest } = image
-			await repo.blobs.uploads(oci.empty.digest, Uint8Array.from([...'{}'].map(c => c.charCodeAt(0)))).unwrap()
-			await repo.blobs.uploads(image.digest, image.bytes).unwrap()
+			await repo.blobs.uploads(oci.empty.digest, emptyObjectData).unwrap()
+			await repo.blobs.uploads(image.digest, image.chunk).unwrap()
 
 			const bytes = encodeString(JSON.stringify(manifest))
 			const digest = hash(bytes)
@@ -353,8 +406,8 @@ describe.concurrent('api v2', async () => {
 	describe.concurrent(title('end-10', 'DELETE', 'blobs/<digest>'), () => {
 		test('202', async () => {
 			const repo = client.repo('test/end-10')
-			const { digest, bytes } = images['v0.1.0']
-			await repo.blobs.uploads(digest, bytes).unwrap()
+			const { digest, chunk } = images['v0.1.0']
+			await repo.blobs.uploads(digest, chunk).unwrap()
 
 			const req = repo.blobs.delete(digest)
 			await expect(req).resolves.ok

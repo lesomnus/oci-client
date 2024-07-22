@@ -1,7 +1,9 @@
+import { Chunk } from './chunk'
 import { Digest } from './digest'
 import type { Endpoint } from './endpoint'
 import type { MediaType } from './media-type'
 import type { oci } from './media-types'
+import { Range } from './range'
 import type { Ref, Reference } from './ref'
 import { type Probe, type Req, probe, result } from './result'
 import type { Transport } from './transport'
@@ -40,7 +42,7 @@ class ApiBase<R extends string> {
 		return `https://${this.ref.domain}/v2/${this.ref.name}/${this.resource}`
 	}
 
-	protected exec<M extends string>(resource: string, endpoint: Ep<R, M>, init?: RequestInit): Promise<Response> {
+	protected exec<M extends string>(resource: URL | string, endpoint: Ep<R, M>, init?: RequestInit): Promise<Response> {
 		return this.transport.fetch(resource, {
 			...init,
 			endpoint: {
@@ -68,12 +70,29 @@ class ApiBase<R extends string> {
 	}
 }
 
-export type BlobsApiV2UploadsInitRes = {
-	location: string
+export type BlobsApiV2UploadInitRes = {
+	location: URL
+	chunkMinLength?: number
+}
+
+export type BlobsApiV2UploadChunkRes = {
+	location: URL
+	range: unknown
 }
 
 export type BlobsApiV2UploadsRes = {
-	location: string
+	location: URL
+}
+
+function normalizeLocation(l: string, domain?: string): URL {
+	if (l.startsWith('http://') || l.startsWith('https://')) {
+		return new URL(l)
+	}
+	if (domain !== undefined) {
+		return new URL(`https://${domain}${l}`)
+	}
+
+	return new URL(`${window.location.origin}${l}`)
 }
 
 export class BlobsApiV2 extends ApiBase<'blobs'> {
@@ -117,14 +136,85 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 		return result(req, () => Promise.resolve({}))
 	}
 
-	uploadsInit(): Req<BlobsApiV2UploadsInitRes> {
+	uploadInit(): Req<BlobsApiV2UploadInitRes> {
 		const u = `${this.urlPrefix}/uploads/`
 		const req = this.exec<'POST'>(u, { action: 'uploads' }, { method: 'POST' })
-		return result(req, res =>
-			Promise.resolve({
-				location: res.headers.get('Location') as string,
-			}),
+		return result(req, res => {
+			const { headers } = res
+			const l = headers.get('Location') as string
+			const location = normalizeLocation(l, this.ref.domain)
+			const chunkMinLength = Number.parseInt(headers.get('OCI-Chunk-Min-Length') ?? '')
+
+			return Promise.resolve({ location, chunkMinLength })
+		})
+	}
+
+	uploadChunk(location: URL | string, chunk: Chunk): Req<BlobsApiV2UploadChunkRes> {
+		const action = 'uploads'
+		if (typeof location === 'string') {
+			location = new URL(location)
+		}
+
+		const req = this.exec<'PATCH'>(
+			location,
+			{ action, location },
+			{
+				method: 'PATCH',
+				headers: {
+					'Content-Length': chunk.length.toString(),
+					'Content-Range': chunk.range.toString(),
+					'Content-Type': 'application/octet-stream',
+				},
+				body: chunk.data,
+			},
 		)
+		return result(req, res => {
+			const l = res.headers.get('Location') as string
+			const location = normalizeLocation(l, this.ref.domain)
+			return Promise.resolve({ location })
+		})
+	}
+
+	uploadClose(location: URL | string, digest: string | Digest, chunkOrData?: Chunk | BufferSource | Blob | ReadableStream) {
+		const action = 'uploads'
+		if (typeof location === 'string') {
+			location = new URL(location)
+		}
+		if (typeof digest === 'string') {
+			digest = Digest.parse(digest)
+		}
+
+		let chunk: Chunk | undefined
+		if (chunkOrData === undefined) {
+			chunk = undefined
+		} else if (chunkOrData instanceof Chunk) {
+			chunk = chunkOrData
+		} else if (!(chunkOrData instanceof ReadableStream)) {
+			chunk = new Chunk(chunkOrData)
+		}
+
+		const init = {
+			method: 'PUT',
+			headers: {} as Record<string, string>,
+			body: chunk ? chunk.data : (chunkOrData as ReadableStream),
+		}
+		if (chunk) {
+			init.headers['Content-Length'] = chunk.length.toString()
+		}
+		if (chunkOrData instanceof Chunk) {
+			init.headers['Content-Range'] = chunkOrData.range.toString()
+		}
+		if (chunkOrData !== undefined) {
+			init.headers['Content-Type'] = 'application/octet-stream'
+		}
+
+		location.searchParams.append('digest', digest.toString())
+		const req = this.exec<'PUT'>(location, { action, digest }, init)
+		return result(req, res => {
+			const l = res.headers.get('Location') as string
+			const location = normalizeLocation(l, this.ref.domain)
+			return Promise.resolve({ location })
+		})
 	}
 
 	/**
@@ -132,21 +222,10 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 	 *
 	 * @see {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#single-post | spec} / {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#endpoints | end-4b}
 	 */
-	uploads(digest: string | Digest, body: BufferSource | Blob): Req<BlobsApiV2UploadsRes>
-	uploads(digest: string | Digest, body: ReadableStream, length: number): Req<BlobsApiV2UploadsRes>
-	uploads(digest: string | Digest, body: BufferSource | Blob | ReadableStream, length?: number): Req<BlobsApiV2UploadsRes> {
+	uploads(digest: string | Digest, chunk: Chunk): Req<BlobsApiV2UploadsRes> {
 		const action = 'uploads'
 		if (typeof digest === 'string') {
 			digest = Digest.parse(digest)
-		}
-		if (body instanceof ReadableStream) {
-		} else if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
-			length = body.byteLength
-		} else if (body instanceof Blob) {
-			length = body.size
-		}
-		if (length === undefined) {
-			throw new Error('length must be provided')
 		}
 
 		const u = `${this.urlPrefix}/uploads/?digest=${digest.toString()}`
@@ -156,17 +235,17 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 			{
 				method: 'POST',
 				headers: {
-					'Content-Length': length.toString(),
+					'Content-Length': chunk.length.toString(),
 					'Content-Type': 'application/octet-stream',
 				},
-				body,
+				body: chunk.data,
 			},
 		)
-		return result(req, res =>
-			Promise.resolve({
-				location: res.headers.get('Location') as string,
-			}),
-		)
+		return result(req, res => {
+			const l = res.headers.get('Location') as string
+			const location = normalizeLocation(l, this.ref.domain)
+			return Promise.resolve({ location })
+		})
 	}
 
 	delete(digest: Digest) {
