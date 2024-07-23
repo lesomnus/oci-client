@@ -121,9 +121,9 @@ describe.concurrent('api v2', async () => {
 	//
 	// All images are Manifest v1.
 	const repo = client.repo(Repo)
-	await repo.blobs.uploads(oci.empty.digest, emptyObjectData).unwrap()
+	await repo.blobs.upload(oci.empty.digest, emptyObjectData).unwrap()
 	for (const image of Object.values(images)) {
-		await repo.blobs.uploads(image.digest, image.chunk).unwrap()
+		await repo.blobs.upload(image.digest, image.chunk).unwrap()
 		await repo.manifests.put(image.ref, oci.image.manifestV1, JSON.stringify(image.manifest)).unwrap()
 	}
 	for (const artifact of Object.values(artifacts)) {
@@ -243,7 +243,7 @@ describe.concurrent('api v2', async () => {
 		test('201', async () => {
 			const { chunk, digest } = images['v0.1.0']
 
-			const req = client.repo('example/end-4b').blobs.uploads(digest, chunk)
+			const req = client.repo('example/end-4b').blobs.upload(digest, chunk)
 			await expect(req).resolves.ok
 
 			const res = await req
@@ -307,8 +307,8 @@ describe.concurrent('api v2', async () => {
 		test('201', async () => {
 			const { ref, digest, chunk, manifest } = images['v0.1.0']
 			const repo = client.repo('example/end-7')
-			await repo.blobs.uploads(digest, chunk)
-			await repo.blobs.uploads(oci.empty.digest, emptyObjectData)
+			await repo.blobs.upload(digest, chunk)
+			await repo.blobs.upload(oci.empty.digest, emptyObjectData)
 
 			const res = await repo.manifests.put(ref, manifest.mediaType, JSON.stringify(manifest))
 			expect(res.raw.status).to.eq(201)
@@ -378,8 +378,8 @@ describe.concurrent('api v2', async () => {
 			const repo = client.repo('test/end-9')
 			const image = images['v0.1.0']
 			const { manifest } = image
-			await repo.blobs.uploads(oci.empty.digest, emptyObjectData).unwrap()
-			await repo.blobs.uploads(image.digest, image.chunk).unwrap()
+			await repo.blobs.upload(oci.empty.digest, emptyObjectData).unwrap()
+			await repo.blobs.upload(image.digest, image.chunk).unwrap()
 
 			const bytes = encodeString(JSON.stringify(manifest))
 			const digest = hash(bytes)
@@ -407,7 +407,7 @@ describe.concurrent('api v2', async () => {
 		test('202', async () => {
 			const repo = client.repo('test/end-10')
 			const { digest, chunk } = images['v0.1.0']
-			await repo.blobs.uploads(digest, chunk).unwrap()
+			await repo.blobs.upload(digest, chunk).unwrap()
 
 			const req = repo.blobs.delete(digest)
 			await expect(req).resolves.ok

@@ -39,10 +39,10 @@ export class ClientV2 {
 	}
 
 	/**
-	 * Test if the server supports OCI v2 APIs and this client is authenticated.
-	 * It throws `Response` if the status is not 200(OK).
+	 * Tests if the registry supports OCI Distribution APIs and this client is authenticated.
+	 * It throws {@link ResError} if the response status is NOT `200 OK`.
 	 *
-	 * @see end-1
+	 * @see Spec {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#determining-support | Determining Support} `end-1`.
 	 */
 	ping() {
 		const u = `https://${this.domain}/v2/`

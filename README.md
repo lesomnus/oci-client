@@ -1,5 +1,8 @@
-OCI Client
----
+# OCI Client
+
+[![Test](https://github.com/lesomnus/oci-client/actions/workflows/test.yaml/badge.svg)](https://github.com/lesomnus/oci-client/actions/workflows/test.yaml)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/d8725577ee654965877ee0be066e7c06)](https://app.codacy.com/gh/lesomnus/oci-client/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+[![Codacy Badge](https://app.codacy.com/project/badge/Coverage/d8725577ee654965877ee0be066e7c06)](https://app.codacy.com/gh/lesomnus/oci-client/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_coverage)
 
 Client implementation of [*OCI*](https://opencontainers.org/) [*Distribution*](https://github.com/opencontainers/distribution-spec).
 It is designed to work in the browser but keeps *Node.js* in mind.

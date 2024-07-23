@@ -70,7 +70,7 @@ class ApiBase<R extends string> {
 	}
 }
 
-export type BlobsApiV2UploadInitRes = {
+export type BlobsApiV2InitUploadRes = {
 	location: URL
 	chunkMinLength?: number
 }
@@ -78,10 +78,6 @@ export type BlobsApiV2UploadInitRes = {
 export type BlobsApiV2UploadChunkRes = {
 	location: URL
 	range: unknown
-}
-
-export type BlobsApiV2UploadsRes = {
-	location: URL
 }
 
 function normalizeLocation(l: string, domain?: string): URL {
@@ -108,9 +104,9 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 	}
 
 	/**
-	 * Checking if content exists in the registry.
+	 * Checks if a blob identified by `digest` exists in the registry.
 	 *
-	 * @see {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#checking-if-content-exists-in-the-registry | spec} / {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#endpoints | end-2}
+	 * @see Spec *{@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#checking-if-content-exists-in-the-registry | Checking if content exists in the registry}* `end-2`.
 	 */
 	exists(digest: string | Digest) {
 		if (typeof digest === 'string') {
@@ -122,9 +118,9 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 	}
 
 	/**
-	 * Retrieve the blob from the registry identified by digest.
+	 * Retrieve the blob from the registry identified by `digest`.
 	 *
-	 * @see {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pulling-blobs | spec} / {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#endpoints | end-2}
+	 * @see Spec *{@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pulling-blobs | Pulling blobs}* `end-2`.
 	 */
 	get(digest: string | Digest) {
 		if (typeof digest === 'string') {
@@ -136,7 +132,24 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 		return result(req, () => Promise.resolve({}))
 	}
 
-	initUpload(): Req<BlobsApiV2UploadInitRes> {
+	/**
+	 * Obtains a session ID to pushing a blob monolothically or in chunks.
+	 * This can be used to offload traffic instead of uploading it with single request using {@link upload}.
+	 *
+	 * @see {@link uploadChunk} to upload a chunk to the session at `location` returned by this request.
+	 * @see Spec *{@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#post-then-put | POST then PUT}* `end-4a`.
+	 *
+	 * @example
+	 * ```ts
+	 * let { location } = await blobs.initUpload().unwrap()
+	 * ;{ location } = await blobs.uploadChunk(location, chunk1).unwrap()
+	 * ;{ location } = await blobs.uploadChunk(location, chunk2).unwrap()
+	 * await blobs.closeUpload().unwrap()
+	 * ```
+	 *
+	 * @returns `202 Accepted` on success.
+	 */
+	initUpload(): Req<BlobsApiV2InitUploadRes> {
 		const u = `${this.urlPrefix}/uploads/`
 		const req = this.exec<'POST'>(u, { action: 'uploads' }, { method: 'POST' })
 		return result(req, res => {
@@ -149,6 +162,22 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 		})
 	}
 
+	/**
+	 * Uploads a chunk to the session at `location` returned by {@link initUpload} or the previous {@link uploadChunk}.
+	 *
+	 * @see Spec *{@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pushing-a-blob-in-chunks | Pushing a blob in chunks}* `end-5`.
+	 *
+	 * @example
+	 * ```ts
+	 * let { location } = await blobs.initUpload().unwrap()
+	 * ;{ location } = await blobs.uploadChunk(location, chunk1).unwrap()
+	 * ;{ location } = await blobs.uploadChunk(location, chunk2).unwrap()
+	 * await blobs.closeUpload().unwrap()
+	 * ```
+	 *
+	 * @returns `202 Accepted` on success.
+	 * @returns `416 Range Not Satisfiable` if a chunk is uploaded out of order.
+	 */
 	uploadChunk(location: URL | string, chunk: Chunk): Req<BlobsApiV2UploadChunkRes> {
 		const action = 'uploads'
 		if (typeof location === 'string') {
@@ -175,6 +204,23 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 		})
 	}
 
+	/**
+	 * Close the upload session at `location` provided by {@link initUpload} or the previous {@link uploadChunk}.
+	 *
+	 * @see Spec *{@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pushing-a-blob-in-chunks | Pushing a blob in chunks}* `end-6`.
+	 *
+	 * @example
+	 * ```ts
+	 * let { location } = await blobs.initUpload().unwrap()
+	 * ;{ location } = await blobs.uploadChunk(location, chunk1).unwrap()
+	 * ;{ location } = await blobs.uploadChunk(location, chunk2).unwrap()
+	 * await blobs.closeUpload().unwrap()
+	 * ```
+	 *
+	 * @param digest Digest of the whole blob (not the final chunk).
+	 *
+	 * @returns `201 Created` on success.
+	 */
 	closeUpload(location: URL | string, digest: string | Digest, chunkOrData?: Chunk | BufferSource | Blob | ReadableStream) {
 		const action = 'uploads'
 		if (typeof location === 'string') {
@@ -217,6 +263,20 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 		})
 	}
 
+	/**
+	 * Retrieves the current status of upload session at `location` provided by {@link initUpload} or the previous {@link uploadChunk}.
+	 *
+	 * @see Spec *{@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pushing-a-blob-in-chunks | Pushing a blob in chunks}* `end-13`.
+	 *
+	 * @example
+	 * ```ts
+	 * let { location } = await blobs.initUpload().unwrap()
+	 * ;{ location } = await blobs.uploadChunk(location, chunk1).unwrap()
+	 * ;{ location, range } = await blobs.getUploadStatus(location).unwrap()
+	 * ;{ location } = await blobs.uploadChunk(location, chunk2).unwrap()
+	 * await blobs.closeUpload().unwrap()
+	 * ```
+	 */
 	getUploadStatus(location: URL | string) {
 		const action = 'uploads'
 		if (typeof location === 'string') {
@@ -234,11 +294,19 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 	}
 
 	/**
-	 * Push a blob by using a single POST request.
+	 * Uploads a blob with a single request.
 	 *
-	 * @see {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#single-post | spec} / {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#endpoints | end-4b}
+	 * If the registry does not support single request monolithic uploads,
+	 * a `location` is returned and uploads can be proceed using {@link uploadChunk}.
+	 *
+	 * @see Spec *{@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#single-post | Single POST}* `end-4b`.
+	 *
+	 * @param digest Digest of the `chunk`.
+	 *
+	 * @returns `201 Created` on success.
+	 * @returns `202 Accepted` if the registry does not support single request monolithic uploads.
 	 */
-	uploads(digest: string | Digest, chunk: Chunk): Req<BlobsApiV2UploadsRes> {
+	upload(digest: string | Digest, chunk: Chunk) {
 		const action = 'uploads'
 		if (typeof digest === 'string') {
 			digest = Digest.parse(digest)
@@ -258,12 +326,28 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 			},
 		)
 		return result(req, res => {
-			const l = res.headers.get('Location') as string
-			const location = normalizeLocation(l, this.ref.domain)
+			const l = res.headers.get('Location')
+			let location: URL | undefined = undefined
+			if (l !== null) {
+				location = normalizeLocation(l, this.ref.domain)
+			}
+
 			return Promise.resolve({ location })
 		})
 	}
 
+	/**
+	 * Mounts a blob from another repository.
+	 * The blob is identified by its name so `from.domain` and `from.reference` is ignored.
+	 *
+	 * If the registry does not support cross-repository mounting or is unable to mount the requested blob,
+	 * uploads can be proceed using {@link uploadChunk} with returned `location`.
+	 *
+	 * @see Spec *{@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#mounting-a-blob-from-another-repository | Mounting a blob from another repository}* `end-11`.
+	 *
+	 * @returns `201 Created` on success.
+	 * @returns `202 Accepted` if the registry does not support cross-repository mounting or is unable to mount the requested blob.
+	 */
 	mount(mount: Digest | string, from?: Ref | string) {
 		const action = 'uploads'
 		if (typeof mount === 'string') {
@@ -287,6 +371,14 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 		})
 	}
 
+	/**
+	 * Deletes a blob identified by `digest`.
+	 *
+	 * @see Spec *{@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#deleting-blobs | Deleting Blobs}* `end-10`.
+	 *
+	 * @returns `202 Accepted` on success.
+	 * @returns `404 Not Found` if the blob not found.
+	 */
 	delete(digest: Digest) {
 		const u = this.#u(digest)
 		return this._delete(u, { digest })
@@ -310,9 +402,9 @@ export class ManifestsApiV2 extends ApiBase<'manifests'> {
 	}
 
 	/**
-	 * Checking if content exists in the registry.
+	 * Checks if a manifest identified by `reference` exists in the registry.
 	 *
-	 * @see {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#checking-if-content-exists-in-the-registry | spec} / {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#endpoints | end-3}
+	 * @see Spec *{@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#checking-if-content-exists-in-the-registry | Checking if content exists in the registry}* `end-3`.
 	 */
 	exists(reference?: Reference) {
 		reference = this.#fallbackReference(reference)
@@ -321,9 +413,9 @@ export class ManifestsApiV2 extends ApiBase<'manifests'> {
 	}
 
 	/**
-	 * Fetch the manifest identified by reference where reference can be a tag or digest.
+	 * Retrieves a manifest identified by `reference`.
 	 *
-	 * @see {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pulling-manifests | spec} / {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#endpoints | end-3}
+	 * @see Spec *{@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pulling-manifests | Pulling manifests}* `end-3`.
 	 */
 	get(reference?: Reference) {
 		reference = this.#fallbackReference(reference)
@@ -332,9 +424,11 @@ export class ManifestsApiV2 extends ApiBase<'manifests'> {
 	}
 
 	/**
-	 * Put the manifest identified by reference where reference can be a tag or digest.
+	 * Pushes a manifest identified by `reference`.
 	 *
-	 * @see {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pushing-manifests | spec} / {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#endpoints | end-7}
+	 * @see Spec *{@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pushing-manifests | Pushing Manifests}* `end-7`.
+	 *
+	 * @returns `201 Created` on success.
 	 */
 	put(reference: Reference, contentType: MediaType, body: BodyInit, init?: RequestInit) {
 		const u = this.#u(reference)
@@ -358,6 +452,14 @@ export class ManifestsApiV2 extends ApiBase<'manifests'> {
 		)
 	}
 
+	/**
+	 * Deletes a manifest identified by `reference`.
+	 *
+	 * @see Spec *{@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#deleting-manifests | Deleting Manifests}* `end-9`.
+	 *
+	 * @returns `202 Accepted` on success.
+	 * @returns `404 Not Found` if the blob not found.
+	 */
 	delete(reference: Reference) {
 		const u = this.#u(reference)
 		return this._delete(u, { reference })
@@ -385,9 +487,13 @@ export class ReferrersApiV2 extends ApiBase<'referrers'> {
 	}
 
 	/**
-	 * Fetch the list of referrers identified by digest.
+	 * Retrieves a list of referrers identified by `digest`.
 	 *
-	 * @see {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#listing-referrers | spec} / {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#endpoints | end-12}
+	 * If the registry supports referrers APIs, `404 Not Found` is NOT returned.
+	 *
+	 * @see Spec {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#listing-referrers | Listing Referrers} `end-12`.
+	 *
+	 * @returns `200 OK` on success.
 	 */
 	get(digest: string | Digest, opts?: ReferrersApiV2GetOpts): Req<ReferrersApiV2GetRes> {
 		if (typeof digest === 'string') {
@@ -413,7 +519,13 @@ export class TagsApiV2 extends ApiBase<'tags'> {
 		super(transport, ref, 'tags')
 	}
 
-	// end-8
+	/**
+	 * Retrieves a list of tags in the repository.
+	 *
+	 * @see Spec {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#listing-tags | Listing Tags} `end-8`.
+	 *
+	 * @returns `200 OK` on success.
+	 */
 	list(opts?: TagsApiV2ListOpts) {
 		if (opts?.n && opts.n < 0) {
 			throw new Error('"n" cannot be negative number')
