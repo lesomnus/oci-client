@@ -228,7 +228,7 @@ describe.concurrent('api v2', async () => {
 	})
 	describe.concurrent(title('end-4a', 'POST', 'blobs/uploads'), () => {
 		test('202', async () => {
-			const req = client.repo('test/end-4a').blobs.uploadInit()
+			const req = client.repo('test/end-4a').blobs.initUpload()
 			await expect(req).resolves.ok
 
 			const res = await req
@@ -258,7 +258,7 @@ describe.concurrent('api v2', async () => {
 		test('202', async () => {
 			const { chunk } = images['v0.1.0']
 			const repo = client.repo('test/end-5')
-			const { location } = await repo.blobs.uploadInit().unwrap()
+			const { location } = await repo.blobs.initUpload().unwrap()
 
 			const req = repo.blobs.uploadChunk(location, chunk)
 			await expect(req).resolves.ok
@@ -273,7 +273,7 @@ describe.concurrent('api v2', async () => {
 		test('416', async () => {
 			const { chunk } = images['v0.1.0']
 			const repo = client.repo('test/end-5')
-			const { location } = await repo.blobs.uploadInit().unwrap()
+			const { location } = await repo.blobs.initUpload().unwrap()
 
 			const req = repo.blobs.uploadChunk(location, chunk.withPos(1))
 			await expect(req).resolves.ok
@@ -290,9 +290,9 @@ describe.concurrent('api v2', async () => {
 		test('201', async () => {
 			const { chunk, digest } = images['v0.1.0']
 			const repo = client.repo('test/end-6')
-			const { location } = await repo.blobs.uploadInit().unwrap()
+			const { location } = await repo.blobs.initUpload().unwrap()
 
-			const req = repo.blobs.uploadClose(location, digest, chunk)
+			const req = repo.blobs.closeUpload(location, digest, chunk)
 			await expect(req).resolves.ok
 
 			const res = await req
@@ -427,6 +427,21 @@ describe.concurrent('api v2', async () => {
 			expect(res.raw.status).to.eq(404)
 		})
 	})
+	describe.concurrent(title('end-11', 'POST', 'blobs/uploads/?mount=<digest>&from=<other_name>'), () => {
+		test('201', async () => {
+			const repo = client.repo('test/end-11')
+			const { digest, ref } = images['v0.1.0']
+
+			const req = repo.blobs.mount(digest, ref)
+			await expect(req).resolves.ok
+
+			const res = await req
+			expect(res.raw.status).to.eq(201)
+
+			const result = res.unwrap()
+			await expect(result).resolves.ok
+		})
+	})
 	describe.concurrent(title('end-12a', 'GET', 'referrers/<digest>'), () => {
 		test('200', async () => {
 			const { digest } = images['v0.1.0']
@@ -483,6 +498,23 @@ describe.concurrent('api v2', async () => {
 				size: artifact.bytes.length,
 				artifactType: artifact.manifest.artifactType,
 			})
+		})
+	})
+	describe.concurrent(title('end-13', 'GET', 'blobs/uploads/<reference>'), () => {
+		test('204', async () => {
+			const repo = client.repo('test/end-13')
+			const { location } = await repo.blobs.initUpload().unwrap()
+
+			const req = repo.blobs.getUploadStatus(location)
+			await expect(req).resolves.ok
+
+			const res = await req
+			expect(res.raw.status).to.eq(204)
+			await expect(res.unwrap()).resolves.ok
+
+			const v = await res.unwrap()
+			expect(v.location).to.be.exist
+			expect(v.range.pos).to.eq(0)
 		})
 	})
 })

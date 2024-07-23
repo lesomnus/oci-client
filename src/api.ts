@@ -3,7 +3,8 @@ import { Digest } from './digest'
 import type { Endpoint } from './endpoint'
 import type { MediaType } from './media-type'
 import type { oci } from './media-types'
-import type { Ref, Reference } from './ref'
+import { Range } from './range'
+import { Ref, type Reference } from './ref'
 import { type Probe, type Req, probe, result } from './result'
 import type { Transport } from './transport'
 
@@ -135,7 +136,7 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 		return result(req, () => Promise.resolve({}))
 	}
 
-	uploadInit(): Req<BlobsApiV2UploadInitRes> {
+	initUpload(): Req<BlobsApiV2UploadInitRes> {
 		const u = `${this.urlPrefix}/uploads/`
 		const req = this.exec<'POST'>(u, { action: 'uploads' }, { method: 'POST' })
 		return result(req, res => {
@@ -174,7 +175,7 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 		})
 	}
 
-	uploadClose(location: URL | string, digest: string | Digest, chunkOrData?: Chunk | BufferSource | Blob | ReadableStream) {
+	closeUpload(location: URL | string, digest: string | Digest, chunkOrData?: Chunk | BufferSource | Blob | ReadableStream) {
 		const action = 'uploads'
 		if (typeof location === 'string') {
 			location = new URL(location)
@@ -216,6 +217,22 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 		})
 	}
 
+	getUploadStatus(location: URL | string) {
+		const action = 'uploads'
+		if (typeof location === 'string') {
+			location = new URL(location)
+		}
+
+		const req = this.exec<'GET'>(location, { action, location }, { method: 'GET' })
+		return result(req, res => {
+			const l = res.headers.get('Location') as string
+			const location = normalizeLocation(l, this.ref.domain)
+			const r = res.headers.get('Range') as string
+			const range = Range.parse(r)
+			return Promise.resolve({ location, range })
+		})
+	}
+
 	/**
 	 * Push a blob by using a single POST request.
 	 *
@@ -240,6 +257,29 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 				body: chunk.data,
 			},
 		)
+		return result(req, res => {
+			const l = res.headers.get('Location') as string
+			const location = normalizeLocation(l, this.ref.domain)
+			return Promise.resolve({ location })
+		})
+	}
+
+	mount(mount: Digest | string, from?: Ref | string) {
+		const action = 'uploads'
+		if (typeof mount === 'string') {
+			mount = Digest.parse(mount)
+		}
+		if (typeof from === 'string') {
+			from = new Ref(from)
+		}
+
+		const params = makeParams({
+			mount: mount.toString(),
+			from: from?.name,
+		})
+
+		const u = `${this.urlPrefix}/uploads/${params}`
+		const req = this.exec<'POST'>(u, { action, mount, from }, { method: 'POST' })
 		return result(req, res => {
 			const l = res.headers.get('Location') as string
 			const location = normalizeLocation(l, this.ref.domain)

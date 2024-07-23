@@ -1,5 +1,5 @@
 import type { Digest } from './digest'
-import type { Reference } from './ref'
+import type { Ref, Reference } from './ref'
 
 export type Endpoint = {
 	name: string
@@ -15,7 +15,7 @@ export type Endpoint = {
 	| { method: 'GET'; resource: 'tags'; action: 'list'; n?: number; last?: string } // end-8
 	| { method: 'DELETE'; resource: 'manifests'; reference: Reference } // end-9
 	| { method: 'DELETE'; resource: 'blobs'; digest: Digest } // end-10
-	| { method: 'POST'; resource: 'blobs'; action: 'uploads'; mount?: string; from?: string } // end-11
+	| { method: 'POST'; resource: 'blobs'; action: 'uploads'; mount: Digest; from?: Ref } // end-11
 	| { method: 'GET'; resource: 'referrers'; artifactType?: string } // end-12
-	| { method: 'GET'; resource: 'blobs'; action: 'uploads'; reference: Reference } // end-13
+	| { method: 'GET'; resource: 'blobs'; action: 'uploads'; location: URL } // end-13
 )
