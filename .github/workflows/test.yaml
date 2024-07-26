@@ -29,10 +29,14 @@ jobs:
           - 5000:5000
 
     steps:
+      - name: Map hostname for registry
+        run: |
+          echo "127.0.0.1 registry" | tee -a /etc/hosts
+
       - name: Wait registry
         run: |
           for ((i=1; i<=30; i++)); do
-              status_code=$(curl -o /dev/null -s -w "%{http_code}\n" "http://localhost:5000/v2/" || true)
+              status_code=$(curl -o /dev/null -s -w "%{http_code}\n" "http://registry:5000/v2/" || true)
               if [ "$status_code" -eq 200 ]; then
                   exit 0
               fi
@@ -52,7 +56,7 @@ jobs:
       - run: npx biome ci .
       - run: npm run test
         env:
-          REGISTRY_DOMAIN: localhost:5000
+          REGISTRY_DOMAIN: registry:5000
       - run: npm run build
 
       - name: Report Coverage
