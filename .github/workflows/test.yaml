@@ -31,7 +31,7 @@ jobs:
     steps:
       - name: Map hostname for registry
         run: |
-          echo "127.0.0.1 registry" | tee -a /etc/hosts
+          echo "127.0.0.1 registry" | sudo tee -a /etc/hosts
 
       - name: Wait registry
         run: |
