@@ -1,5 +1,5 @@
 import { Chunk } from './chunk'
-import { Digest } from './digest'
+import { Digest, type Hasher } from './digest'
 import type { Endpoint } from './endpoint'
 import type { MediaType } from './media-type'
 import type { oci } from './media-types'
@@ -19,6 +19,17 @@ type Ep<R extends string, M extends string> = DistributiveOmit<
 	'method' | 'name' | 'resource'
 >
 
+function normalizeLocation(l: string, domain?: string): URL {
+	if (l.startsWith('http://') || l.startsWith('https://')) {
+		return new URL(l)
+	}
+	if (domain !== undefined) {
+		return new URL(`https://${domain}${l}`)
+	}
+
+	return new URL(`${window.location.origin}${l}`)
+}
+
 function makeParams(obj?: Record<string, undefined | string | number>): string {
 	if (obj === undefined) {
 		return ''
@@ -29,6 +40,90 @@ function makeParams(obj?: Record<string, undefined | string | number>): string {
 		.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
 		.join('&')
 	return params === '' ? '' : `?${params}`
+}
+
+export class BlobsV2Upload {
+	#client: BlobsApiV2
+	#hasher: Hasher
+
+	// It is set by negative number if this upload session is closed.
+	#pos: number
+
+	#location: Promise<URL>
+	#buffer = new Uint8Array(4 * 1024 * 1024)
+
+	constructor(transport: Transport, ref: Ref, hash: Hasher) {
+		this.#client = new BlobsApiV2(transport, ref)
+		this.#hasher = hash
+		this.#pos = 0
+
+		this.#location = this.#client
+			.initUpload()
+			.unwrap()
+			.then(({ location, chunkMinLength }) => {
+				if (chunkMinLength !== undefined && chunkMinLength < this.#buffer.byteLength) {
+					this.#buffer = new Uint8Array(chunkMinLength)
+				}
+				return location
+			})
+	}
+
+	#toReadableStream(data: BufferSource | Blob | ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
+		if (data instanceof ReadableStream) {
+			return data
+		}
+		if (!(data instanceof Blob)) {
+			data = new Blob([data])
+		}
+
+		return data.stream()
+	}
+
+	write(data: BufferSource | Blob | ReadableStream<Uint8Array>) {
+		const s = this.#toReadableStream(data)
+		const r = s.getReader({ mode: 'byob' })
+
+		this.#location = this.#location.then(async l => {
+			while (true) {
+				const { value, done } = await r.read(this.#buffer)
+				if (value) {
+					this.#buffer = new Uint8Array(value.buffer)
+				}
+				if (done) {
+					break
+				}
+
+				const chunk = new Chunk(value, this.#pos)
+				this.#pos += value.byteLength
+
+				const req = this.#client.uploadChunk(l, chunk).unwrap()
+				this.#hasher.update(value)
+
+				const { location } = await req
+				l = location
+			}
+
+			return l
+		})
+
+		return this.#location as unknown as Promise<void>
+	}
+
+	close() {
+		if (this.#pos < 0) {
+			return this.#location
+		}
+
+		this.#location = this.#location.then(async l => {
+			const encoded = this.#hasher.digest()
+			const digest = new Digest(this.#hasher.name, encoded)
+			this.#pos = -1
+
+			const { location } = await this.#client.closeUpload(l, digest).unwrap()
+			return location
+		})
+		return this.#location
+	}
 }
 
 class ApiBase<R extends string> {
@@ -80,17 +175,6 @@ export type BlobsApiV2UploadChunkRes = {
 	range: unknown
 }
 
-function normalizeLocation(l: string, domain?: string): URL {
-	if (l.startsWith('http://') || l.startsWith('https://')) {
-		return new URL(l)
-	}
-	if (domain !== undefined) {
-		return new URL(`https://${domain}${l}`)
-	}
-
-	return new URL(`${window.location.origin}${l}`)
-}
-
 export class BlobsApiV2 extends ApiBase<'blobs'> {
 	constructor(
 		readonly transport: Transport,
@@ -137,6 +221,7 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 	 * This can be used to offload traffic instead of uploading it with single request using {@link upload}.
 	 *
 	 * @see {@link uploadChunk} to upload a chunk to the session at `location` returned by this request.
+	 * @see {@link startUpload} to get high-level interface.
 	 * @see Spec *{@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#post-then-put | POST then PUT}* `end-4a`.
 	 *
 	 * @example
@@ -261,6 +346,22 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 			const location = normalizeLocation(l, this.ref.domain)
 			return Promise.resolve({ location })
 		})
+	}
+
+	/**
+	 * Creates a blob uploader.
+	 *
+	 * @see {@link initUpload} to upload a blob with more fine-grained control.
+	 * @example
+	 * ```ts
+	 * const upload = blobs.startUpload(sha256Hasher)
+	 * await upload.write(chunk1)
+	 * await upload.write(chunk2)
+	 * const { location } = await upload.close()
+	 * ```
+	 */
+	startUpload(hasher: Hasher): BlobsV2Upload {
+		return new BlobsV2Upload(this.transport, this.ref, hasher)
 	}
 
 	/**

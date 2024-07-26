@@ -1,5 +1,11 @@
 import Patterns from './regexp'
 
+export type Hasher = {
+	name: string
+	update(data: Uint8Array): void
+	digest(): string
+}
+
 const HashPatterns: Record<string, undefined | RegExp> = {
 	sha256: Patterns.Digest.Sha256,
 	sha512: Patterns.Digest.Sha512,

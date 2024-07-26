@@ -12,7 +12,7 @@ export interface Transport {
 
 export class FetchTransport implements Transport {
 	fetch(resource: RequestInfo | URL, init?: ReqInit): Promise<Response> {
-		return window.fetch(resource, init)
+		return fetch(resource, init)
 	}
 }
 

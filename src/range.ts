@@ -37,6 +37,9 @@ export class Range {
 		if (length === undefined) {
 			return
 		}
+		if (length === 0) {
+			throw new Error('length cannot be zero')
+		}
 
 		// `pos` of -1 means end of the data.
 		if (pos === -1 && length < 0) {

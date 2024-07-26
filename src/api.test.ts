@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createSHA256, sha256 } from 'hash-wasm'
 
 import { Chunk } from './chunk'
 import { ClientV2 } from './client'
@@ -12,11 +12,8 @@ function encodeString(data: string): Uint8Array {
 	return encoder.encode(data)
 }
 
-function hash(data: Uint8Array): Digest {
-	const sha256 = createHash('sha256')
-	sha256.update(data)
-	const v = sha256.digest('hex')
-
+async function hash(data: Uint8Array): Promise<Digest> {
+	const v = await sha256(data)
 	return new Digest('sha256', v)
 }
 
@@ -37,69 +34,74 @@ function toRecord<T extends { key: string }>(vs: T[]) {
 describe.concurrent('api v2', async () => {
 	const emptyObjectData = new Chunk(Uint8Array.from([...'{}'].map(c => c.charCodeAt(0))))
 	const images = toRecord(
-		[
-			{
-				key: 'v0.1.0',
-				data: 'Revenge is a dish best served cold.',
-			},
-			{
-				key: 'v0.2.0',
-				data: 'Silly Caucasian girl likes to play with Samurai swords',
-			},
-			{
-				key: 'v0.3.0',
-				data: 'They will be things you will miss',
-			},
-		].map(init => {
-			const bytes = encodeString(init.data)
-			const digest = hash(bytes)
-			return {
-				...init,
-				ref: init.key,
-				bytes,
-				chunk: new Chunk(bytes),
-				digest: hash(bytes),
-				manifest: {
+		await Promise.all(
+			[
+				{
+					key: 'v0.1.0',
+					data: 'Revenge is a dish best served cold.',
+				},
+				{
+					key: 'v0.2.0',
+					data: 'Silly Caucasian girl likes to play with Samurai swords',
+				},
+				{
+					key: 'v0.3.0',
+					data: 'They will be things you will miss',
+				},
+			].map(async init => {
+				const bytes = encodeString(init.data)
+				const digest = await hash(bytes)
+				return {
+					...init,
+					bytes,
+					digest,
+					ref: init.key,
+					chunk: new Chunk(bytes),
+					manifest: {
+						schemaVersion: 2,
+						mediaType: oci.image.manifestV1,
+						config: oci.empty,
+						layers: [
+							{
+								mediaType: 'application/octet-stream',
+								digest: digest.toString(),
+								size: bytes.byteLength,
+							},
+						],
+					},
+				}
+			}),
+		),
+	)
+
+	const artifacts = toRecord(
+		await Promise.all(
+			['application/foo', 'application/bar'].map(async key => {
+				const manifest: oci.image.ManifestV1 = {
 					schemaVersion: 2,
 					mediaType: oci.image.manifestV1,
+					artifactType: key,
 					config: oci.empty,
-					layers: [
-						{
-							mediaType: 'application/octet-stream',
+					layers: [oci.empty],
+					subject: (() => {
+						const {
+							bytes,
+							digest,
+							manifest: { mediaType },
+						} = images['v0.1.0']
+						return {
+							mediaType,
 							digest: digest.toString(),
-							size: bytes.byteLength,
-						},
-					],
-				},
-			}
-		}),
-	)
-	const artifacts = toRecord(
-		['application/foo', 'application/bar'].map(key => {
-			const manifest: oci.image.ManifestV1 = {
-				schemaVersion: 2,
-				mediaType: oci.image.manifestV1,
-				artifactType: key,
-				config: oci.empty,
-				layers: [oci.empty],
-				subject: (() => {
-					const {
-						bytes,
-						digest,
-						manifest: { mediaType },
-					} = images['v0.1.0']
-					return {
-						mediaType,
-						digest: digest.toString(),
-						size: bytes.length,
-					}
-				})(),
-			}
-			const bytes = encodeString(JSON.stringify(manifest))
-			const digest = hash(bytes)
+							size: bytes.length,
+						}
+					})(),
+				}
+				const bytes = encodeString(JSON.stringify(manifest))
+				const digest = await hash(bytes)
 
-			return { key, bytes, digest, manifest }
-		}),
+				return { key, bytes, digest, manifest }
+			}),
+		),
 	)
 
 	const Repo = 'test/test'
@@ -382,7 +384,7 @@ describe.concurrent('api v2', async () => {
 			await repo.blobs.upload(image.digest, image.chunk).unwrap()
 
 			const bytes = encodeString(JSON.stringify(manifest))
-			const digest = hash(bytes)
+			const digest = await hash(bytes)
 			await repo.manifests.put(digest, oci.image.manifestV1, JSON.stringify(image.manifest)).unwrap()
 
 			const req = repo.manifests.delete(digest)
@@ -395,7 +397,7 @@ describe.concurrent('api v2', async () => {
 			await expect(result).resolves.ok
 		})
 		test('404', async () => {
-			const digest = hash(new Uint8Array())
+			const digest = await hash(new Uint8Array())
 			const req = repo.manifests.delete(digest)
 			await expect(req).resolves.ok
 
@@ -419,7 +421,7 @@ describe.concurrent('api v2', async () => {
 			await expect(result).resolves.ok
 		})
 		test('404', async () => {
-			const digest = hash(new Uint8Array())
+			const digest = await hash(new Uint8Array())
 			const req = repo.blobs.delete(digest)
 			await expect(req).resolves.ok
 
@@ -503,7 +505,8 @@ describe.concurrent('api v2', async () => {
 	describe.concurrent(title('end-13', 'GET', 'blobs/uploads/<reference>'), () => {
 		test('204', async () => {
 			const repo = client.repo('test/end-13')
-			const { location } = await repo.blobs.initUpload().unwrap()
+			let { location } = await repo.blobs.initUpload().unwrap()
+			;({ location } = await repo.blobs.uploadChunk(location, new Chunk(Uint8Array.from([1, 2, 3]))).unwrap())
 
 			const req = repo.blobs.getUploadStatus(location)
 			await expect(req).resolves.ok
@@ -515,6 +518,20 @@ describe.concurrent('api v2', async () => {
 			const v = await res.unwrap()
 			expect(v.location).to.be.exist
 			expect(v.range.pos).to.eq(0)
+			expect(v.range.length).to.eq(3)
 		})
+	})
+
+	test('BlobsV2Upload', async () => {
+		const { bytes } = images['v0.1.0']
+		const hasher = await createSHA256()
+		const chunkSize = Math.floor(bytes.length / 3)
+
+		const repo = client.repo('test/blobs-upload')
+		const upload = repo.blobs.startUpload({ ...hasher, name: 'sha256' })
+		await upload.write(bytes.subarray(0, chunkSize))
+		await upload.write(bytes.subarray(chunkSize, chunkSize * 2))
+		await upload.write(bytes.subarray(chunkSize * 2))
+		await upload.close()
 	})
 })

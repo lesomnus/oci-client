@@ -23,11 +23,9 @@ export default defineConfig({
 		host: '0.0.0.0',
 	},
 	test: {
-		globals: true,
-		environment: 'jsdom',
 		coverage: {
 			enabled: true,
-			provider: 'v8',
+			provider: 'istanbul',
 			reporter: ['html', 'lcov'],
 		},
 	},

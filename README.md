@@ -68,8 +68,8 @@ All APIs are implemented as described in [Distribution spec v1.1.0](https://gith
 | end-8b  | `GET`          | `/v2/<name>/tags/list?n=<integer>&last=<tagname>`            |
 | end-9   | `DELETE`       | `/v2/<name>/manifests/<reference>`                           |
 | end-10  | `DELETE`       | `/v2/<name>/blobs/<digest>`                                  |
-| end-11  | `POST`         | `/v2/<name>/blobs/uploads/?mount=<digest>&from=<other_name`> |
+| end-11  | `POST`         | `/v2/<name>/blobs/uploads/?mount=<digest>&from=<other_name>` |
 | end-12a | `GET`          | `/v2/<name>/referrers/<digest>`                              |
-| end-12b | `GET`          | `/v2/<name>/referrers/<digest>?artifactType=<artifactType`   |
+| end-12b | `GET`          | `/v2/<name>/referrers/<digest>?artifactType=<artifactType>`  |
 | end-13  | `GET`          | `/v2/<name>/blobs/uploads/<reference>`                       |
 

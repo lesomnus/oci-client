@@ -7,7 +7,7 @@ export class Chunk {
 
 	constructor(data: BufferSource | Blob, pos?: number)
 	constructor(data: ReadableStream, length: number, pos?: number)
-	constructor(data: BufferSource | Blob | ReadableStream, lengthOrPos?: number, pos?: number) {
+	constructor(data: BufferSource | Blob | ReadableStream<Uint8Array>, lengthOrPos?: number, pos?: number) {
 		this.data = data
 		if (data instanceof ReadableStream) {
 			if (lengthOrPos === undefined) {
