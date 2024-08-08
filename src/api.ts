@@ -154,12 +154,12 @@ class ApiBase<R extends string> {
 		return probe(raw)
 	}
 
-	protected _get<T extends {}>(resource: string, endpoint: Ep<R, 'GET'>, init?: RequestInit): Req<T> {
+	protected _get<T extends {}>(resource: string, endpoint: Ep<R, 'GET'>, init?: RequestInit) {
 		const req = this.exec(resource, endpoint, { ...init, method: 'GET' })
-		return result(req, res => res.json())
+		return result<T>(req, res => res.json())
 	}
 
-	protected _delete<T extends {}>(resource: string, endpoint: Ep<R, 'DELETE'>, init?: RequestInit): Req<T> {
+	protected _delete(resource: string, endpoint: Ep<R, 'DELETE'>, init?: RequestInit) {
 		const req = this.exec(resource, endpoint, { ...init, method: 'DELETE' })
 		return result(req, res => Promise.resolve({}))
 	}
@@ -227,8 +227,8 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 	 * @example
 	 * ```ts
 	 * let { location } = await blobs.initUpload().unwrap()
-	 * ;{ location } = await blobs.uploadChunk(location, chunk1).unwrap()
-	 * ;{ location } = await blobs.uploadChunk(location, chunk2).unwrap()
+	 * ;({ location } = await blobs.uploadChunk(location, chunk1).unwrap())
+	 * ;({ location } = await blobs.uploadChunk(location, chunk2).unwrap())
 	 * await blobs.closeUpload().unwrap()
 	 * ```
 	 *
@@ -255,8 +255,8 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 	 * @example
 	 * ```ts
 	 * let { location } = await blobs.initUpload().unwrap()
-	 * ;{ location } = await blobs.uploadChunk(location, chunk1).unwrap()
-	 * ;{ location } = await blobs.uploadChunk(location, chunk2).unwrap()
+	 * ;({ location } = await blobs.uploadChunk(location, chunk1).unwrap())
+	 * ;({ location } = await blobs.uploadChunk(location, chunk2).unwrap())
 	 * await blobs.closeUpload().unwrap()
 	 * ```
 	 *
@@ -297,8 +297,8 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 	 * @example
 	 * ```ts
 	 * let { location } = await blobs.initUpload().unwrap()
-	 * ;{ location } = await blobs.uploadChunk(location, chunk1).unwrap()
-	 * ;{ location } = await blobs.uploadChunk(location, chunk2).unwrap()
+	 * ;({ location } = await blobs.uploadChunk(location, chunk1).unwrap())
+	 * ;({ location } = await blobs.uploadChunk(location, chunk2).unwrap())
 	 * await blobs.closeUpload().unwrap()
 	 * ```
 	 *
@@ -371,10 +371,11 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 	 *
 	 * @example
 	 * ```ts
+	 * let range: Range
 	 * let { location } = await blobs.initUpload().unwrap()
-	 * ;{ location } = await blobs.uploadChunk(location, chunk1).unwrap()
-	 * ;{ location, range } = await blobs.getUploadStatus(location).unwrap()
-	 * ;{ location } = await blobs.uploadChunk(location, chunk2).unwrap()
+	 * ;({ location } = await blobs.uploadChunk(location, chunk1).unwrap())
+	 * ;({ location, range } = await blobs.getUploadStatus(location).unwrap())
+	 * ;({ location } = await blobs.uploadChunk(location, chunk2).unwrap())
 	 * await blobs.closeUpload().unwrap()
 	 * ```
 	 */
@@ -518,10 +519,42 @@ export class ManifestsApiV2 extends ApiBase<'manifests'> {
 	 *
 	 * @see Spec *{@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pulling-manifests | Pulling manifests}* `end-3`.
 	 */
-	get(reference?: Reference) {
+	get(reference?: Reference): Req<{
+		/**
+		 * Returns a structured message as-is with the type defined by the given `mediaType`.
+		 * Note that it does not validate or modify the message.
+		 *
+		 * @example
+		 * ```ts
+		 * const opaque = await client
+		 *   .repo('library/node')
+		 *   .manifests.get().unwrap()
+		 *
+		 * const v = opaque.as(oci.image.indexV1)
+		 * console.log(v.manifests[0].platform.os) // 'linux'
+		 * ```
+		 */
+		as<T, S extends string>(mediaType: MediaType<T, S>): T | undefined
+	}> {
 		reference = this.#fallbackReference(reference)
 		const u = this.#u(reference)
-		return this._get(u, { reference })
+		const req = this.exec(u, { reference }, { method: 'GET' })
+		return result(req, res =>
+			res.json().then(v => ({
+				...v,
+				as<T, S extends string>(mediaType: MediaType<T, S>) {
+					const t = res.headers.get('Content-Type')
+					if (t !== null && t === mediaType) {
+						return v as unknown as T
+					}
+					if ('mediaType' in v && v.mediaType === mediaType) {
+						return v as unknown as T
+					}
+
+					return undefined
+				},
+			})),
+		)
 	}
 
 	/**

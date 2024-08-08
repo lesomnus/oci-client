@@ -11,6 +11,8 @@ export * from './result'
 
 export * from './auth'
 export * from './transport'
+export * from './client'
 
 export * from './api'
-export * from './client'
+export * from './client-v2'
+export * as ext from './ext'

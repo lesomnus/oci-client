@@ -1,5 +1,4 @@
 import { ResError } from './error'
-import type { MediaType } from './media-type'
 
 type ResBase = {
 	raw: Response
@@ -15,7 +14,7 @@ export type ErrorResponse = {
 	errors: ErrorEntry[]
 }
 
-export type Unwrapped<T> = ResBase & T & As
+export type Unwrapped<T> = ResBase & T
 
 type Unwrap<T> = {
 	unwrapOr<U>(cb: (res: Response, errors: ErrorEntry[]) => U): Promise<Unwrapped<T> | U>
@@ -38,25 +37,9 @@ export type Result<T extends {}> = ResBase & Unwrap<T>
 
 export type Req<T extends {}> = Promise<Result<T>> & Result<T>
 
-type As = {
-	/**
-	 * Returns a structured message as-is with the type defined by the given `mediaType`.
-	 * Note that it does not validate or modify the message.
-	 *
-	 * @example
-	 * ```ts
-	 * const opaque = await client
-	 *   .repo('library/node')
-	 *   .manifests.get().unwrap()
-	 *
-	 * const v = opaque.as(oci.image.indexV1)
-	 * console.log(v.manifests[0].platform.os) // 'linux'
-	 * ```
-	 */
-	as<T, S extends string>(mediaType: MediaType<T, S>): T | undefined
-}
+class ErrorEntries extends Array<ErrorEntry> {}
 
-export function result<T extends {}>(req: Promise<Response>, onSuccess: (res: Response) => Promise<T>): Req<T> {
+export function wrap<T extends {}>(req: Promise<Response>, resolve: (res: Response) => Promise<T>) {
 	req = req.then(res => {
 		if (res.status >= 500) {
 			throw new ResError(res, 'server error')
@@ -65,36 +48,18 @@ export function result<T extends {}>(req: Promise<Response>, onSuccess: (res: Re
 		return res
 	})
 
-	const unwrapOr: Unwrap<T>['unwrapOr'] = async <U>(cb: (res: Response, errors: ErrorEntry[]) => U) => {
+	const unwrapOr: Req<T>['unwrapOr'] = async <U>(cb: (res: Response, errors: ErrorEntry[]) => U) => {
 		const raw = await req
-		if (raw.status >= 400) {
-			let errors: ErrorEntry[] = []
-			if (raw.headers.get('Content-Type')?.includes('application/json')) {
-				errors = (await raw.json()).errors
-			}
-
-			const v = cb(raw, errors)
+		try {
+			const res = await resolve(raw)
+			return { raw, ...res }
+		} catch (e) {
+			const errs = e instanceof ErrorEntries ? e : new ErrorEntries()
+			const v = cb(raw, errs)
 			return v
 		}
-
-		const v = await onSuccess(raw)
-		return {
-			raw,
-			...v,
-			as<T, S extends string>(mediaType: MediaType<T, S>) {
-				const t = raw.headers.get('Content-Type')
-				if (t !== null && t === mediaType) {
-					return v as unknown as T
-				}
-				if ('mediaType' in v && v.mediaType === mediaType) {
-					return v as unknown as T
-				}
-
-				return undefined
-			},
-		}
 	}
-	const unwrap: Unwrap<T>['unwrap'] = async (cb?: (res: Response, errors: ErrorEntry[]) => void) => {
+	const unwrap: Req<T>['unwrap'] = async (cb?: (res: Response, errors: ErrorEntry[]) => void) => {
 		return unwrapOr((raw, errors) => {
 			cb?.(raw, errors)
 			throw new ResError(raw, 'expected a result but was an error')
@@ -105,6 +70,22 @@ export function result<T extends {}>(req: Promise<Response>, onSuccess: (res: Re
 	rst.unwrapOr = unwrapOr
 	rst.unwrap = unwrap
 	return rst
+}
+
+export function result<T extends {}>(req: Promise<Response>, onSuccess: (res: Response) => Promise<T>) {
+	return wrap(req, async (raw: Response): Promise<T> => {
+		if (raw.status >= 400) {
+			let errors: ErrorEntry[] = []
+			if (raw.headers.get('Content-Type')?.includes('application/json')) {
+				errors = (await raw.json()).errors
+			}
+
+			throw new ErrorEntries(...errors)
+		}
+
+		const v = await onSuccess(raw)
+		return { raw, ...v }
+	})
 }
 
 export type Probe = ResBase & { ok: boolean }

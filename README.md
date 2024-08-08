@@ -52,6 +52,8 @@ console.log(index?.manifests[0].platform.os)
 
 ## Implemented APIs
 
+### OCI
+
 All APIs are implemented as described in [Distribution spec v1.1.0](https://github.com/opencontainers/distribution-spec/blob/0f98d91a0afe7ed3ab0f29349beed2bb4ba1507d/spec.md).
 
 | ID      | Method         | API Endpoint                                                 |
@@ -73,3 +75,14 @@ All APIs are implemented as described in [Distribution spec v1.1.0](https://gith
 | end-12b | `GET`          | `/v2/<name>/referrers/<digest>?artifactType=<artifactType>`  |
 | end-13  | `GET`          | `/v2/<name>/blobs/uploads/<reference>`                       |
 
+### Catalog
+
+List image repositories.
+
+Complies:
+- [Zot Registry](https://zotregistry.dev/v2.1.0/developer-guide/api-reference/#get-v2_catalog)
+- 🏗️[distribution/distribution](https://github.com/distribution/distribution/blob/4772604ae973031ab32dd9805a4bccf61d94909f/docs/spec/api.md#listing-repositories)
+
+| Method | API Endpoint  |
+| ------ | ------------- |
+| `GET`  | `/v2/_catalog |

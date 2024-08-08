@@ -27,6 +27,7 @@ export default defineWorkspace([
 				},
 				headless: true,
 				fileParallelism: true,
+				screenshotFailures: false,
 			},
 		},
 	},
