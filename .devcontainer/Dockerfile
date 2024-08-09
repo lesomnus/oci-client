@@ -1,5 +1,13 @@
 FROM ghcr.io/lesomnus/dev-node:20
 
+RUN TEMP=$(mktemp -d) \
+	ARCH=$(dpkg --print-architecture) \
+	&& cd "${TEMP}" \
+	&& curl -o ./a.tar.gz -sSL "https://get.helm.sh/helm-v3.15.3-linux-${ARCH}.tar.gz" \
+	&& tar -zxf ./a.tar.gz \
+	&& mv "linux-${ARCH}/helm" /usr/local/bin/. \
+	&& rm -rf "${TEMP}"
+
 
 
 USER hypnos

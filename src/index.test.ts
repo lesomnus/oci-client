@@ -7,7 +7,6 @@ test('export', () => {
 	expect(lib.Codes).to.be.exist
 	expect(lib.Digest).to.be.exist
 	expect(lib.ResError).to.be.exist
-	expect(lib.mediaType).to.be.exist
 	expect(lib.Range).to.be.exist
 	expect(lib.Ref).to.be.exist
 	expect(lib.result).to.be.exist

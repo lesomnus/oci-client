@@ -8,7 +8,7 @@
 	},
 	"license": "Apache-2.0",
 	"type": "module",
-	"files": ["dist", "src", "!src/*.test.ts"],
+	"files": ["dist", "src", "!src/**/*.test.ts"],
 	"main": "./dist/main.cjs.js",
 	"module": "./dist/main.js",
 	"exports": {
@@ -41,6 +41,8 @@
 		"typescript": "^5.2.2",
 		"vite": "^5.3.1",
 		"vite-plugin-dts": "^3.9.1",
-		"vitest": "^2.0.3"
+		"vite-tsconfig-paths": "^5.0.0",
+		"vitest": "^2.0.3",
+		"zx": "^8.1.4"
 	}
 }

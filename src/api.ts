@@ -1,8 +1,8 @@
 import { Chunk } from './chunk'
 import { Digest, type Hasher } from './digest'
 import type { Endpoint } from './endpoint'
-import type { MediaType } from './media-type'
-import type { oci } from './media-types'
+import type { vnd } from './media-types'
+import type { MediaType } from './media-types/t'
 import { Range } from './range'
 import { Ref, type Reference } from './ref'
 import { type Probe, type Req, probe, result } from './result'
@@ -173,6 +173,10 @@ export type BlobsApiV2InitUploadRes = {
 export type BlobsApiV2UploadChunkRes = {
 	location: URL
 	range: unknown
+}
+
+export type BlobsApiV2UploadRes = {
+	location: URL
 }
 
 export class BlobsApiV2 extends ApiBase<'blobs'> {
@@ -408,10 +412,15 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 	 * @returns `201 Created` on success.
 	 * @returns `202 Accepted` if the registry does not support single request monolithic uploads.
 	 */
-	upload(digest: string | Digest, chunk: Chunk) {
+	upload(digest: string | Digest, data: BufferSource | Blob, pos?: number): Req<BlobsApiV2UploadRes>
+	upload(digest: string | Digest, chunk: Chunk): Req<BlobsApiV2UploadRes>
+	upload(digest: string | Digest, chunk: BufferSource | Blob | Chunk, pos?: number): Req<BlobsApiV2UploadRes> {
 		const action = 'uploads'
 		if (typeof digest === 'string') {
 			digest = Digest.parse(digest)
+		}
+		if (!(chunk instanceof Chunk)) {
+			chunk = new Chunk(chunk, pos)
 		}
 
 		const u = `${this.urlPrefix}/uploads/?digest=${digest.toString()}`
@@ -530,11 +539,11 @@ export class ManifestsApiV2 extends ApiBase<'manifests'> {
 		 *   .repo('library/node')
 		 *   .manifests.get().unwrap()
 		 *
-		 * const v = opaque.as(oci.image.indexV1)
+		 * const v = opaque.as(vnd.oci.image.indexV1)
 		 * console.log(v.manifests[0].platform.os) // 'linux'
 		 * ```
 		 */
-		as<T, S extends string>(mediaType: MediaType<T, S>): T | undefined
+		as<T, S extends string>(mediaType: MediaType<T, S>): unknown extends T ? undefined : T | undefined
 	}> {
 		reference = this.#fallbackReference(reference)
 		const u = this.#u(reference)
@@ -603,9 +612,9 @@ export class ManifestsApiV2 extends ApiBase<'manifests'> {
 export type ReferrersApiV2GetOpts = {
 	artifactType?: string
 }
-export type ReferrersApiV2GetRes = oci.image.IndexV1<
-	| typeof oci.image.indexV1 //
-	| typeof oci.image.manifestV1
+export type ReferrersApiV2GetRes = vnd.oci.image.IndexV1<
+	| typeof vnd.oci.image.indexV1 //
+	| typeof vnd.oci.image.manifestV1
 >
 
 export class ReferrersApiV2 extends ApiBase<'referrers'> {

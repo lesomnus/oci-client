@@ -1,9 +1,8 @@
 import { Catalog } from './catalog'
 
-import { ClientV2 } from '../client-v2'
-import { oci } from '../media-types'
-import * as T from '../testutils'
-import { FetchTransport, Unsecure } from '../transport'
+import { ClientV2, FetchTransport, Unsecure } from '~/index'
+import { vnd } from '~/media-types'
+import T from '~/testutils'
 
 describe.concurrent('ext catalog', async () => {
 	const Client = ClientV2.with(Catalog())
@@ -14,9 +13,9 @@ describe.concurrent('ext catalog', async () => {
 	const init = async (ref: string) => {
 		const image = T.asset.Images['v0.1.0']
 		const repo = client.repo(ref)
-		await repo.blobs.upload(oci.empty.digest, T.asset.EmptyObjectData).unwrap()
+		await repo.blobs.upload(vnd.oci.empty.digest, T.asset.EmptyObjectData).unwrap()
 		await repo.blobs.upload(image.digest, image.chunk).unwrap()
-		await repo.manifests.put(image.ref, oci.image.manifestV1, JSON.stringify(image.manifest)).unwrap()
+		await repo.manifests.put(image.ref, vnd.oci.image.manifestV1, JSON.stringify(image.manifest)).unwrap()
 	}
 
 	const Repos = ['catalog/a', 'catalog/b', 'catalog/c'].sort()

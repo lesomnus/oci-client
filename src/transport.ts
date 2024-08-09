@@ -1,5 +1,5 @@
 import type { Endpoint } from './endpoint'
-import type { MediaType } from './media-type'
+import type { MediaType } from './media-types/t'
 
 // Extra field for transport internal use.
 export type ReqInit = RequestInit & {

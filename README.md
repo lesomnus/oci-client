@@ -37,13 +37,13 @@ console.log(v)
 ### Get Manifest
 ```ts
 import { ClientV2 } from '@lesomns/oci-client'
-import { oci } from '@lesomnus/oci-client/media-types'
+import { vnd } from '@lesomnus/oci-client/media-types'
 
 const client = new ClientV2('index.docker.io')
 await client.ping()
 
 const opaque = await client.repo('library/node').manifests.get('latest').unwrap()
-const index = opaque.as(oci.image.indexV1)
+const index = opaque.as(vnd.oci.image.indexV1)
 console.log(index?.manifests[0].platform.os)
 // "linux"
 ```

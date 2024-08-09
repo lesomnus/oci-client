@@ -1,5 +1,6 @@
-import { Chunk } from '../chunk'
-import { oci } from '../media-types'
+import { Chunk } from '~/index'
+import { vnd } from '~/media-types'
+
 import { encodeString, hash, toRecord } from './misc'
 
 export const HashOfNotExists = await hash(Uint8Array.from([1, 2, 3]))
@@ -30,8 +31,8 @@ export const Images = toRecord(
 				chunk: new Chunk(bytes),
 				manifest: {
 					schemaVersion: 2,
-					mediaType: oci.image.manifestV1,
-					config: oci.empty,
+					mediaType: vnd.oci.image.manifestV1,
+					config: vnd.oci.empty,
 					layers: [
 						{
 							mediaType: 'application/octet-stream',
@@ -48,12 +49,12 @@ export const Images = toRecord(
 export const Artifacts = toRecord(
 	await Promise.all(
 		['application/foo', 'application/bar'].map(async key => {
-			const manifest: oci.image.ManifestV1 = {
+			const manifest: vnd.oci.image.ManifestV1 = {
 				schemaVersion: 2,
-				mediaType: oci.image.manifestV1,
+				mediaType: vnd.oci.image.manifestV1,
 				artifactType: key,
-				config: oci.empty,
-				layers: [oci.empty],
+				config: vnd.oci.empty,
+				layers: [vnd.oci.empty],
 				subject: (() => {
 					const {
 						bytes,

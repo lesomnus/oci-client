@@ -1,4 +1,4 @@
-import { type MediaType, mediaType } from '../media-type'
+import { type MediaType, mediaType } from '~/media-types/t'
 
 /**
  * @see {@link https://github.com/opencontainers/image-spec/blob/main/manifest.md#guidance-for-an-empty-descriptor | Guidance for an Empty Descriptor}
@@ -86,7 +86,7 @@ export namespace image {
 		 * This field MAY be removed in a future version of the specification.
 		 */
 		schemaVersion: (number & {}) & 2
-		mediaType: typeof manifestV1
+		mediaType?: typeof manifestV1
 		artifactType?: string
 		config: DescriptorV1
 		layers: DescriptorV1<

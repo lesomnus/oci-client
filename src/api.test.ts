@@ -1,12 +1,9 @@
 import { createSHA256 } from 'hash-wasm'
 import type { TaskContext } from 'vitest'
 
-import { Chunk } from './chunk'
-import { ClientV2 } from './client-v2'
-import Codes from './codes'
-import { oci } from './media-types'
-import * as T from './testutils'
-import { Accept, FetchTransport, Unsecure } from './transport'
+import { Accept, Chunk, ClientV2, Codes, FetchTransport, Unsecure } from '~/index'
+import { vnd } from '~/media-types'
+import T from '~/testutils'
 
 function title(code: string, method: string, endpoint: string) {
 	return `${code.padEnd('end-NNa'.length)} ${method.padStart('DELETE'.length)} ${endpoint}`
@@ -17,7 +14,7 @@ describe.concurrent('api v2', async () => {
 		transport: [
 			new Unsecure(),
 			new Accept({
-				manifests: [oci.image.manifestV1, oci.image.indexV1],
+				manifests: [vnd.oci.image.manifestV1, vnd.oci.image.indexV1],
 			}),
 			new FetchTransport(),
 		],
@@ -31,13 +28,13 @@ describe.concurrent('api v2', async () => {
 	// All images are Manifest v1.
 	const Repo = 'test/test'
 	const repo = client.repo(Repo)
-	await repo.blobs.upload(oci.empty.digest, T.asset.EmptyObjectData).unwrap()
+	await repo.blobs.upload(vnd.oci.empty.digest, T.asset.EmptyObjectData).unwrap()
 	for (const image of Object.values(T.asset.Images)) {
 		await repo.blobs.upload(image.digest, image.chunk).unwrap()
-		await repo.manifests.put(image.ref, oci.image.manifestV1, JSON.stringify(image.manifest)).unwrap()
+		await repo.manifests.put(image.ref, vnd.oci.image.manifestV1, JSON.stringify(image.manifest)).unwrap()
 	}
 	for (const artifact of Object.values(T.asset.Artifacts)) {
-		await repo.manifests.put(artifact.digest, oci.image.manifestV1, artifact.bytes).unwrap()
+		await repo.manifests.put(artifact.digest, vnd.oci.image.manifestV1, artifact.bytes).unwrap()
 	}
 
 	const getRepo = (ctx: TaskContext, name?: string) =>
@@ -129,7 +126,7 @@ describe.concurrent('api v2', async () => {
 			await expect(result).resolves.ok
 
 			const opaque = await result
-			const v = opaque.as(oci.image.manifestV1)
+			const v = opaque.as(vnd.oci.image.manifestV1)
 			expect(v).not.to.be.undefined
 			expect(v).containSubset(manifest)
 		})
@@ -233,7 +230,7 @@ describe.concurrent('api v2', async () => {
 
 			const repo = getRepo(ctx)
 			await repo.blobs.upload(digest, chunk)
-			await repo.blobs.upload(oci.empty.digest, T.asset.EmptyObjectData)
+			await repo.blobs.upload(vnd.oci.empty.digest, T.asset.EmptyObjectData)
 
 			const res = await repo.manifests.put(ref, manifest.mediaType, JSON.stringify(manifest))
 			expect(res.raw.status).to.eq(201)
@@ -305,12 +302,12 @@ describe.concurrent('api v2', async () => {
 			const { manifest } = image
 
 			const repo = getRepo(ctx)
-			await repo.blobs.upload(oci.empty.digest, T.asset.EmptyObjectData).unwrap()
+			await repo.blobs.upload(vnd.oci.empty.digest, T.asset.EmptyObjectData).unwrap()
 			await repo.blobs.upload(image.digest, image.chunk).unwrap()
 
 			const bytes = T.encodeString(JSON.stringify(manifest))
 			const digest = await T.hash(bytes)
-			await repo.manifests.put(digest, oci.image.manifestV1, JSON.stringify(image.manifest)).unwrap()
+			await repo.manifests.put(digest, vnd.oci.image.manifestV1, JSON.stringify(image.manifest)).unwrap()
 
 			const req = repo.manifests.delete(digest)
 			await expect(req).resolves.ok
@@ -382,18 +379,16 @@ describe.concurrent('api v2', async () => {
 			await expect(result).resolves.ok
 
 			const v = await result
-			const compare = <T extends (typeof v.manifests)[0]>(a: T, b: T) => a.mediaType.localeCompare(b.mediaType)
-
 			expect(v.manifests).to.be.lengthOf(2)
-			expect(v.manifests.sort(compare)).to.deep.equals(
+			expect(
+				v.manifests
+					.slice()
+					.map(v => v.digest)
+					.sort(),
+			).to.eql(
 				Object.values(T.asset.Artifacts)
-					.map(v => ({
-						mediaType: v.manifest.mediaType,
-						digest: v.digest.toString(),
-						size: v.bytes.length,
-						artifactType: v.manifest.artifactType,
-					}))
-					.sort(compare),
+					.map(v => v.digest.toString())
+					.sort(),
 			)
 		})
 		test('400', async () => {

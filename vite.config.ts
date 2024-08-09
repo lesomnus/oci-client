@@ -1,10 +1,12 @@
 import { resolve } from 'node:path'
 
 import dts from 'vite-plugin-dts'
+import tsconfigPaths from 'vite-tsconfig-paths'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
 	plugins: [
+		tsconfigPaths(),
 		dts({
 			exclude: ['vite.config.ts', '*.test.ts'],
 		}),

@@ -1,1 +1,1 @@
-export * as oci from './oci'
+export * as vnd from './vnd'

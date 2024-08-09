@@ -50,6 +50,9 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.15.3
 
       - run: npm clean-install
       - run: npx playwright install --with-deps chromium
