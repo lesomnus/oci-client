@@ -8,7 +8,7 @@ export default defineConfig({
 	plugins: [
 		tsconfigPaths(),
 		dts({
-			exclude: ['vite.config.ts', '*.test.ts'],
+			exclude: ['vite.config.ts', 'src/**/*.test.ts'],
 		}),
 	],
 	build: {

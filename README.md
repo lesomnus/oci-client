@@ -8,7 +8,6 @@ Client implementation of [*OCI*](https://opencontainers.org/) [*Distribution*](h
 It is designed to work in the browser but keeps *Node.js* in mind.
 
 ## Install
-> Not yet
 ```bash
 npm i @lesomnus/oci-client
 ```

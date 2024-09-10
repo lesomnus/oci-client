@@ -8,7 +8,6 @@
 	},
 	"license": "Apache-2.0",
 	"type": "module",
-	"files": ["dist", "src", "!src/**/*.test.ts"],
 	"main": "./dist/main.cjs.js",
 	"module": "./dist/main.js",
 	"exports": {
