@@ -84,4 +84,4 @@ Complies:
 
 | Method | API Endpoint  |
 | ------ | ------------- |
-| `GET`  | `/v2/_catalog |
+| `GET`  | `/v2/_catalog` |
