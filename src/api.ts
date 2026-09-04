@@ -1,6 +1,7 @@
 import { Chunk } from './chunk'
 import { Digest, type Hasher } from './digest'
 import type { Endpoint } from './endpoint'
+import { ResError } from './error'
 import type { vnd } from './media-types'
 import type { MediaType } from './media-types/t'
 import { Range } from './range'
@@ -27,7 +28,40 @@ function normalizeLocation(l: string, domain?: string): URL {
 		return new URL(`https://${domain}${l}`)
 	}
 
-	return new URL(`${window.location.origin}${l}`)
+	// There is no origin to resolve a relative location with in a runtime that is
+	// not a browser, e.g. Node.js.
+	const origin = globalThis.location?.origin
+	if (origin === undefined) {
+		throw new Error('cannot resolve a relative location without a domain')
+	}
+
+	return new URL(`${origin}${l}`)
+}
+
+/**
+ * Reads the "Location" header of the response.
+ * It throws {@link ResError} if the header is not given.
+ */
+function locationOf(res: Response, domain?: string): URL {
+	const l = res.headers.get('Location')
+	if (l === null) {
+		throw new ResError(res, 'no "Location" header in the response')
+	}
+
+	return normalizeLocation(l, domain)
+}
+
+/**
+ * Reads the "Range" header of the response.
+ * It throws {@link ResError} if the header is not given.
+ */
+function rangeOf(res: Response): Range {
+	const r = res.headers.get('Range')
+	if (r === null) {
+		throw new ResError(res, 'no "Range" header in the response')
+	}
+
+	return Range.parse(r)
 }
 
 function makeParams(obj?: Record<string, undefined | string | number>): string {
@@ -61,7 +95,9 @@ export class BlobsV2Upload {
 			.initUpload()
 			.unwrap()
 			.then(({ location, chunkMinLength }) => {
-				if (chunkMinLength !== undefined && chunkMinLength < this.#buffer.byteLength) {
+				// The registry rejects a chunk shorter than `chunkMinLength`
+				// so the buffer has to be grown to hold at least that much.
+				if (chunkMinLength !== undefined && chunkMinLength > this.#buffer.byteLength) {
 					this.#buffer = new Uint8Array(chunkMinLength)
 				}
 				return location
@@ -172,11 +208,14 @@ export type BlobsApiV2InitUploadRes = {
 
 export type BlobsApiV2UploadChunkRes = {
 	location: URL
-	range: unknown
 }
 
 export type BlobsApiV2UploadRes = {
-	location: URL
+	/**
+	 * It is not given if the registry responded without a "Location" header,
+	 * which the spec requires but not every registry provides.
+	 */
+	location?: URL
 }
 
 export class BlobsApiV2 extends ApiBase<'blobs'> {
@@ -242,10 +281,11 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 		const u = `${this.urlPrefix}/uploads/`
 		const req = this.exec<'POST'>(u, { action: 'uploads' }, { method: 'POST' })
 		return result(req, res => {
-			const { headers } = res
-			const l = headers.get('Location') as string
-			const location = normalizeLocation(l, this.ref.domain)
-			const chunkMinLength = Number.parseInt(headers.get('OCI-Chunk-Min-Length') ?? '', 10)
+			const location = locationOf(res, this.ref.domain)
+
+			const v = res.headers.get('OCI-Chunk-Min-Length')
+			const n = v === null ? Number.NaN : Number.parseInt(v, 10)
+			const chunkMinLength = Number.isNaN(n) ? undefined : n
 
 			return Promise.resolve({ location, chunkMinLength })
 		})
@@ -286,11 +326,7 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 				body: chunk.data,
 			},
 		)
-		return result(req, res => {
-			const l = res.headers.get('Location') as string
-			const location = normalizeLocation(l, this.ref.domain)
-			return Promise.resolve({ location })
-		})
+		return result(req, res => Promise.resolve({ location: locationOf(res, this.ref.domain) }))
 	}
 
 	/**
@@ -312,9 +348,8 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 	 */
 	closeUpload(location: URL | string, digest: string | Digest, chunkOrData?: Chunk | BufferSource | Blob | ReadableStream) {
 		const action = 'uploads'
-		if (typeof location === 'string') {
-			location = new URL(location)
-		}
+		// A copy is made since the digest is appended to the query.
+		const u = new URL(location)
 		if (typeof digest === 'string') {
 			digest = Digest.parse(digest)
 		}
@@ -343,13 +378,9 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 			init.headers['Content-Type'] = 'application/octet-stream'
 		}
 
-		location.searchParams.append('digest', digest.toString())
-		const req = this.exec<'PUT'>(location, { action, digest }, init)
-		return result(req, res => {
-			const l = res.headers.get('Location') as string
-			const location = normalizeLocation(l, this.ref.domain)
-			return Promise.resolve({ location })
-		})
+		u.searchParams.set('digest', digest.toString())
+		const req = this.exec<'PUT'>(u, { action, digest }, init)
+		return result(req, res => Promise.resolve({ location: locationOf(res, this.ref.domain) }))
 	}
 
 	/**
@@ -390,13 +421,12 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 		}
 
 		const req = this.exec<'GET'>(location, { action, location }, { method: 'GET' })
-		return result(req, res => {
-			const l = res.headers.get('Location') as string
-			const location = normalizeLocation(l, this.ref.domain)
-			const r = res.headers.get('Range') as string
-			const range = Range.parse(r)
-			return Promise.resolve({ location, range })
-		})
+		return result(req, res =>
+			Promise.resolve({
+				location: locationOf(res, this.ref.domain),
+				range: rangeOf(res),
+			}),
+		)
 	}
 
 	/**
@@ -438,11 +468,7 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 		)
 		return result(req, res => {
 			const l = res.headers.get('Location')
-			let location: URL | undefined
-			if (l !== null) {
-				location = normalizeLocation(l, this.ref.domain)
-			}
-
+			const location = l === null ? undefined : normalizeLocation(l, this.ref.domain)
 			return Promise.resolve({ location })
 		})
 	}
@@ -475,11 +501,7 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 
 		const u = `${this.urlPrefix}/uploads/${params}`
 		const req = this.exec<'POST'>(u, { action, mount, from }, { method: 'POST' })
-		return result(req, res => {
-			const l = res.headers.get('Location') as string
-			const location = normalizeLocation(l, this.ref.domain)
-			return Promise.resolve({ location })
-		})
+		return result(req, res => Promise.resolve({ location: locationOf(res, this.ref.domain) }))
 	}
 
 	/**
@@ -588,11 +610,7 @@ export class ManifestsApiV2 extends ApiBase<'manifests'> {
 			},
 		)
 
-		return result(req, res =>
-			Promise.resolve({
-				location: res.headers.get('Location') as string,
-			}),
-		)
+		return result(req, res => Promise.resolve({ location: locationOf(res, this.ref.domain) }))
 	}
 
 	/**

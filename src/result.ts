@@ -54,9 +54,14 @@ export function wrap<T extends {}>(req: Promise<Response>, resolve: (res: Respon
 			const res = await resolve(raw)
 			return { raw, ...res }
 		} catch (e) {
-			const errs = e instanceof ErrorEntries ? e : new ErrorEntries()
-			const v = cb(raw, errs)
-			return v
+			// Anything else than `ErrorEntries` means the response could not be
+			// handled at all, which is not an error response; it is propagated
+			// as-is so the reason is not lost.
+			if (!(e instanceof ErrorEntries)) {
+				throw e
+			}
+
+			return cb(raw, e)
 		}
 	}
 	const unwrap: Req<T>['unwrap'] = async (cb?: (res: Response, errors: ErrorEntry[]) => void) => {
@@ -77,7 +82,12 @@ export function result<T extends {}>(req: Promise<Response>, onSuccess: (res: Re
 		if (raw.status >= 400) {
 			let errors: ErrorEntry[] = []
 			if (raw.headers.get('Content-Type')?.includes('application/json')) {
-				errors = (await raw.json()).errors
+				try {
+					errors = (await raw.json()).errors ?? []
+				} catch {
+					// The body is not a well-formed error response.
+					// It is reported without entries rather than failing here.
+				}
 			}
 
 			throw new ErrorEntries(...errors)

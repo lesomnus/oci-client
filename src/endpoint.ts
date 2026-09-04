@@ -11,7 +11,7 @@ export type Endpoint = {
 	| { method: 'POST'; resource: 'blobs'; action: 'uploads'; digest?: Digest } // end-4
 	| { method: 'PATCH'; resource: 'blobs'; action: 'uploads'; location: URL } // end-5
 	| { method: 'PUT'; resource: 'blobs'; action: 'uploads'; digest: Digest } // end-6
-	| { method: 'PUT'; resource: 'blobs'; action: 'manifests'; reference: Reference; digest?: Digest } // end-7
+	| { method: 'PUT'; resource: 'manifests'; reference: Reference } // end-7
 	| { method: 'GET'; resource: 'tags'; action: 'list'; n?: number; last?: string } // end-8
 	| { method: 'DELETE'; resource: 'manifests'; reference: Reference } // end-9
 	| { method: 'DELETE'; resource: 'blobs'; digest: Digest } // end-10

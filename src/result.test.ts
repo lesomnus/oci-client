@@ -47,6 +47,26 @@ describe('result', () => {
 			await expect(rst).rejects.toThrowError(ResError)
 			expect(touched).to.be.true
 		})
+		it('rejects the error raised while resolving a successful response', async () => {
+			const res = new Response(null, { status: 200 })
+			const req = Promise.resolve(res)
+			const rst = result(req, () => Promise.reject(new Error('cannot resolve'))).unwrap()
+			await expect(rst).rejects.toThrowError('cannot resolve')
+		})
+		it('reports an error response of which body is not a well-formed', async () => {
+			const res = new Response('*not a json*', {
+				status: 400,
+				headers: { 'Content-Type': 'application/json' },
+			})
+			const req = Promise.resolve(res)
+
+			let errors: unknown
+			const rst = result(req, () => Promise.resolve({})).unwrap((_, errs) => {
+				errors = errs
+			})
+			await expect(rst).rejects.toThrowError(ResError)
+			expect(errors).to.eql([])
+		})
 		it('invokes given callback with errors if available', async () => {
 			let touched = false
 

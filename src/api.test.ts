@@ -237,7 +237,7 @@ describe.concurrent('api v2', async () => {
 			await expect(res.unwrap()).resolves.toBeTruthy()
 
 			const v = await res.unwrap()
-			expect(v.location).not.to.be.empty
+			expect(v.location).to.be.instanceOf(URL)
 		})
 	})
 	describe.concurrent(title('end-8a', 'GET', 'tags/list'), () => {
