@@ -1,6 +1,6 @@
 import { RepoV2 } from './api'
 import { TransportAuthorizer } from './auth'
-import { ClientBase, type ClientExtension, type ClientInit } from './client'
+import { ClientBase, type ClientExtension, type ClientInit, type ClientMixin } from './client'
 import { ResError } from './error'
 import { Ref } from './ref'
 import Patterns from './regexp'
@@ -71,17 +71,39 @@ function evaluate(domain: string, init?: ClientInit): [string, Transport] {
 	return [domain, transport]
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: it is required to distribute the union
+type UnionToIntersection<U> = (U extends any ? (v: U) => void : never) extends (v: infer I) => void ? I : never
+
 export class ClientV2 extends clientV2(ClientBase) {
-	// TODO: I want something like:
-	// ClientV2.with(Catalog, ExtA, ExtB, ...)
-	static with<T extends ClientExtension>(extension: T) {
-		const C = clientV2(extension)
+	/**
+	 * Creates a client class of which instances have the features added by the
+	 * given extensions. The extensions are applied in the order they are given.
+	 *
+	 * @example
+	 * ```ts
+	 * const Client = ClientV2.with(Catalog)
+	 * const client = new Client('index.docker.io')
+	 * const v = await client.catalog().unwrap()
+	 * ```
+	 */
+	static with<Ms extends ClientMixin[]>(...mixins: Ms) {
+		let Base: ClientExtension = ClientBase
+		for (const mixin of mixins) {
+			Base = mixin(Base)
+		}
+
+		const C = clientV2(Base)
 		return class V2 extends C {
 			constructor(domain: string, init?: ClientInit) {
 				const [d, t] = evaluate(domain, init)
 				super(d, t)
 			}
-		}
+			// The mixins are composed at runtime so the type of the result has
+			// to be described here.
+		} as unknown as new (
+			domain: string,
+			init?: ClientInit,
+		) => ClientV2 & UnionToIntersection<InstanceType<ReturnType<Ms[number]>>>
 	}
 
 	constructor(domain: string, init?: ClientInit) {

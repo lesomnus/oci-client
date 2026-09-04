@@ -4,6 +4,7 @@ import type { Endpoint } from './endpoint'
 import { ResError } from './error'
 import type { vnd } from './media-types'
 import type { MediaType } from './media-types/t'
+import { makeParams } from './params'
 import { Range } from './range'
 import { Ref, type Reference } from './ref'
 import { type Probe, probe, type Req, result } from './result'
@@ -62,18 +63,6 @@ function rangeOf(res: Response): Range {
 	}
 
 	return Range.parse(r)
-}
-
-function makeParams(obj?: Record<string, undefined | string | number>): string {
-	if (obj === undefined) {
-		return ''
-	}
-
-	const params = Object.entries(obj)
-		.filter((e): e is [string, string | number] => e[1] !== undefined)
-		.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-		.join('&')
-	return params === '' ? '' : `?${params}`
 }
 
 export class BlobsV2Upload {

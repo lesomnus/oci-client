@@ -25,3 +25,10 @@ export class ClientBase {
 
 // biome-ignore lint/suspicious/noExplicitAny: TS requires it
 export type ClientExtension = new (...args: any[]) => ClientBase
+
+/**
+ * Adds a feature to a client by deriving the class it is given.
+ *
+ * @see {@link ClientV2.with} to compose the client with the extensions.
+ */
+export type ClientMixin<T extends ClientExtension = ClientExtension> = (Base: ClientExtension) => T
