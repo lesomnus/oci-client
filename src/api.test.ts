@@ -201,9 +201,11 @@ describe.concurrent('api v2', async () => {
 			const res = await req
 			expect(res.raw.status).to.eq(416)
 
+			// The spec does not define which code is reported for it; zot says
+			// `BLOB_UPLOAD_INVALID` while distribution says `RANGE_INVALID`.
 			const errors = await res.unwrapOr((_, errors) => errors)
 			if (!Array.isArray(errors)) expect.unreachable()
-			expect(errors.some(err => err.code === Codes.BlobUploadInvalid)).to.be.true
+			expect(errors).not.to.be.empty
 		})
 	})
 	describe.concurrent(title('end-6', 'PUT', 'blobs/uploads/<reference>?digest=_'), () => {
@@ -283,7 +285,7 @@ describe.concurrent('api v2', async () => {
 			expect(v.tags).to.be.instanceOf(Array)
 			expect(v.tags).to.eql(['v0.3.0'])
 		})
-		test('404', async ctx => {
+		test.runIf(T.env.Supports.unknownRepository)('404', async ctx => {
 			const repo = getRepo(ctx, 'end-8b-not-exists')
 			const req = repo.tags.list({ n: 2, last: 'v0.2.0' })
 			await expect(req).resolves.toBeTruthy()
@@ -351,7 +353,7 @@ describe.concurrent('api v2', async () => {
 		})
 	})
 	describe.concurrent(title('end-11', 'POST', 'blobs/uploads/?mount=<digest>&from=<other_name>'), () => {
-		test('201', async ctx => {
+		test.runIf(T.env.Supports.crossRepositoryMount)('201', async ctx => {
 			const { digest, ref } = T.asset.Images['v0.1.0']
 
 			const repo = getRepo(ctx)
@@ -363,6 +365,19 @@ describe.concurrent('api v2', async () => {
 
 			const result = res.unwrap()
 			await expect(result).resolves.toBeTruthy()
+		})
+		test.skipIf(T.env.Supports.crossRepositoryMount)('202', async ctx => {
+			const { digest, ref } = T.asset.Images['v0.1.0']
+
+			const repo = getRepo(ctx, 'end-11-no-mount')
+			const res = await repo.blobs.mount(digest, ref)
+
+			// The registry cannot mount the blob so it opened a session to
+			// upload it to instead.
+			expect(res.raw.status).to.eq(202)
+
+			const v = await res.unwrap()
+			expect(v.location).to.be.instanceOf(URL)
 		})
 	})
 	describe.concurrent(title('end-12a', 'GET', 'referrers/<digest>'), () => {
@@ -379,6 +394,13 @@ describe.concurrent('api v2', async () => {
 			await expect(result).resolves.toBeTruthy()
 
 			const v = await result
+			if (!T.env.Supports.referrers) {
+				// The referrers are listed by the tag schema, which nothing
+				// maintains here, so there is none to be found.
+				expect(v.manifests).to.be.empty
+				return
+			}
+
 			expect(v.manifests).to.be.lengthOf(2)
 			expect(
 				v.manifests
@@ -391,7 +413,7 @@ describe.concurrent('api v2', async () => {
 					.sort(),
 			)
 		})
-		test('400', async () => {
+		test.runIf(T.env.Supports.referrers)('400', async () => {
 			// It is a well-formed digest but the registry does not know the algorithm.
 			const req = repo.referrers.get('foo:bar')
 			await expect(req).resolves.toBeTruthy()
@@ -415,6 +437,11 @@ describe.concurrent('api v2', async () => {
 			await expect(result).resolves.toBeTruthy()
 
 			const v = await result
+			if (!T.env.Supports.referrers) {
+				expect(v.manifests).to.be.empty
+				return
+			}
+
 			expect(v.manifests).to.be.lengthOf(1)
 			expect(v.manifests[0]).to.deep.equals({
 				mediaType: artifact.manifest.mediaType,

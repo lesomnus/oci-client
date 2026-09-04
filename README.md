@@ -78,6 +78,26 @@ console.log(v.repositories)
 
 
 
+## Tested Registries
+
+Every release is tested against the registries below on the two most recent LTS
+versions of *Node.js*, in *Node.js* and in the browser.
+
+| Registry                                                     | Version   |
+| ------------------------------------------------------------ | --------- |
+| [zot](https://zotregistry.dev/)                              | `v2.1.20` |
+| [distribution](https://distribution.github.io/distribution/) | `v3.1.1`  |
+
+The spec leaves some of the behaviors to the registry, which this client
+smooths over where it can:
+
+| Behavior                                     | *zot*        | *distribution*                          |
+| -------------------------------------------- | ------------ | --------------------------------------- |
+| `end-4b` blob upload in a single request     | `201`        | `202`, closed with an additional request |
+| `end-8`  `404` for an unknown repository     | ✅           | ❌ answers `200` with no tag            |
+| `end-11` cross-repository mount              | ✅           | ❌ answers `202` to upload the blob     |
+| `end-12` Referrers API                       | ✅           | ❌ the referrers tag schema is used      |
+
 ## Implemented APIs
 
 ### OCI
