@@ -80,23 +80,30 @@ console.log(v.repositories)
 
 ## Tested Registries
 
-Every release is tested against the registries below on the two most recent LTS
+Every change is tested against the registries below on the two most recent LTS
 versions of *Node.js*, in *Node.js* and in the browser.
 
 | Registry                                                     | Version   |
 | ------------------------------------------------------------ | --------- |
 | [zot](https://zotregistry.dev/)                              | `v2.1.20` |
 | [distribution](https://distribution.github.io/distribution/) | `v3.1.1`  |
+| [distribution](https://distribution.github.io/distribution/) | `v2.8.3`  |
 
-The spec leaves some of the behaviors to the registry, which this client
-smooths over where it can:
+The spec leaves some of the behaviors to the registry and not every registry
+complies with all of it. This client smooths over what it can:
 
-| Behavior                                     | *zot*        | *distribution*                          |
-| -------------------------------------------- | ------------ | --------------------------------------- |
-| `end-4b` blob upload in a single request     | `201`        | `202`, closed with an additional request |
-| `end-8`  `404` for an unknown repository     | ✅           | ❌ answers `200` with no tag            |
-| `end-11` cross-repository mount              | ✅           | ❌ answers `202` to upload the blob     |
-| `end-12` Referrers API                       | ✅           | ❌ the referrers tag schema is used      |
+| Behavior                                                | *zot* | *distribution v3* | *distribution v2* |
+| -------------------------------------------------------- | ----- | ----------------- | ----------------- |
+| `end-4b` stores the blob in a single request            | ✅    | ❌ answers `202`  | ❌ answers `202`  |
+| `end-5`  `416` for a chunk uploaded out of order        | ✅    | ✅                | ❌ answers `202`  |
+| `end-8a` lists the tags in lexical order                | ✅    | ✅                | ❌                |
+| `end-8b` paginates the tags by `n` and `last`           | ✅    | ✅                | ❌ lists them all |
+| `end-8b` `404` for a repository that does not exist     | ✅    | ❌ answers `200`  | ✅                |
+| `end-12` Referrers API                                  | ✅    | ❌                | ❌                |
+
+`end-4b` and `end-12` are handled by the client, so a blob is uploaded and the
+referrers are listed whichever registry is on the other end. The rest is the
+registry answering differently for the same request.
 
 ## Implemented APIs
 

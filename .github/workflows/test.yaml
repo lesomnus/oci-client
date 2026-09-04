@@ -35,7 +35,7 @@ jobs:
       - run: npm run build
 
   test:
-    name: node ${{ matrix.node }} / ${{ matrix.registry.name }}
+    name: node ${{ matrix.node }} / ${{ matrix.registry.kind }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -44,9 +44,11 @@ jobs:
         # The two most recent LTS versions of Node.js.
         node: [22, 24]
         registry:
-          - name: zot
+          - kind: zot
             image: ghcr.io/project-zot/zot-minimal:v2.1.20
-          - name: distribution
+          - kind: distribution-v2
+            image: registry:2.8.3
+          - kind: distribution-v3
             image: ghcr.io/distribution/distribution:3.1.1
 
     services:
@@ -89,10 +91,10 @@ jobs:
       - run: npm run test
         env:
           REGISTRY_DOMAIN: registry:5000
-          REGISTRY_KIND: ${{ matrix.registry.name }}
+          REGISTRY_KIND: ${{ matrix.registry.kind }}
 
       - name: Report Coverage
-        if: matrix.node == 24 && matrix.registry.name == 'zot'
+        if: matrix.node == 24 && matrix.registry.kind == 'zot'
         uses: codacy/codacy-coverage-reporter-action@v1.3.0
         with:
           project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}

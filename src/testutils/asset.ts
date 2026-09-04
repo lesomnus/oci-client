@@ -23,24 +23,33 @@ export const Images = toRecord(
 		].map(async init => {
 			const bytes = encodeString(init.data)
 			const digest = await hash(bytes)
+			const manifest = {
+				schemaVersion: 2,
+				mediaType: vnd.oci.image.manifestV1,
+				config: vnd.oci.empty,
+				layers: [
+					{
+						mediaType: 'application/octet-stream',
+						digest: digest.toString(),
+						size: bytes.byteLength,
+					},
+				],
+			}
+
+			// The manifest is kept as bytes so that it is pushed as it is
+			// digested; a subject has to reference a manifest, not a blob.
+			const manifestBytes = encodeString(JSON.stringify(manifest))
+			const manifestDigest = await hash(manifestBytes)
+
 			return {
 				...init,
 				bytes,
 				digest,
 				ref: init.key,
 				chunk: new Chunk(bytes),
-				manifest: {
-					schemaVersion: 2,
-					mediaType: vnd.oci.image.manifestV1,
-					config: vnd.oci.empty,
-					layers: [
-						{
-							mediaType: 'application/octet-stream',
-							digest: digest.toString(),
-							size: bytes.byteLength,
-						},
-					],
-				},
+				manifest,
+				manifestBytes,
+				manifestDigest,
 			}
 		}),
 	),
@@ -57,14 +66,14 @@ export const Artifacts = toRecord(
 				layers: [vnd.oci.empty],
 				subject: (() => {
 					const {
-						bytes,
-						digest,
+						manifestBytes,
+						manifestDigest,
 						manifest: { mediaType },
 					} = Images['v0.1.0']
 					return {
 						mediaType,
-						digest: digest.toString(),
-						size: bytes.length,
+						digest: manifestDigest.toString(),
+						size: manifestBytes.byteLength,
 					}
 				})(),
 			}
