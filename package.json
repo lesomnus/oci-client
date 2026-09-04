@@ -47,6 +47,7 @@
 	],
 	"scripts": {
 		"build": "tsc && vite build",
+		"prepare": "npm run build",
 		"test": "vitest",
 		"test:ui": "vitest --ui",
 		"check": "biome check --write ."
