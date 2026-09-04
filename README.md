@@ -43,7 +43,7 @@ await client.ping()
 
 const opaque = await client.repo('library/node').manifests.get('latest').unwrap()
 const index = opaque.as(vnd.oci.image.indexV1)
-console.log(index?.manifests[0].platform.os)
+console.log(index?.manifests[0].platform?.os)
 // "linux"
 ```
 
@@ -130,14 +130,18 @@ All APIs are implemented as described in [Distribution spec v1.1.0](https://gith
 | end-12b | `GET`          | `/v2/<name>/referrers/<digest>?artifactType=<artifactType>`  |
 | end-13  | `GET`          | `/v2/<name>/blobs/uploads/<reference>`                       |
 
+`end-4b` and `end-12` are answered differently depending on the registry and
+this client handles both, see [Tested Registries](#tested-registries).
+
 ### Catalog
 
 List image repositories.
 
 Complies:
 - [Zot Registry](https://zotregistry.dev/v2.1.0/developer-guide/api-reference/#get-v2_catalog)
-- 🏗️[distribution/distribution](https://github.com/distribution/distribution/blob/4772604ae973031ab32dd9805a4bccf61d94909f/docs/spec/api.md#listing-repositories)
+- [distribution/distribution](https://github.com/distribution/distribution/blob/4772604ae973031ab32dd9805a4bccf61d94909f/docs/spec/api.md#listing-repositories)
 
-| Method | API Endpoint  |
-| ------ | ------------- |
-| `GET`  | `/v2/_catalog` |
+| Method | API Endpoint                                    |
+| ------ | ----------------------------------------------- |
+| `GET`  | `/v2/_catalog`                                  |
+| `GET`  | `/v2/_catalog?n=<integer>&last=<repository>`    |
