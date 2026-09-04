@@ -168,7 +168,11 @@ export class Accept implements TransportMiddleware {
 	}
 
 	fetch(resource: RequestInfo | URL, init: ReqInit | undefined, next: Transport): Promise<Response> {
-		if (methodOf(resource, init) !== 'GET') {
+		// "HEAD" negotiates the content the same way "GET" does; a registry may
+		// answer `404 Not Found` for a manifest it cannot represent as one of
+		// the accepted media types.
+		const method = methodOf(resource, init)
+		if (method !== 'GET' && method !== 'HEAD') {
 			return next.fetch(resource, init)
 		}
 

@@ -335,13 +335,10 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 	 *
 	 * @returns `201 Created` on success.
 	 */
-	closeUpload(location: URL | string, digest: string | Digest, chunkOrData?: Chunk | BufferSource | Blob | ReadableStream) {
+	#closeUpload(location: URL | string, digest: Digest, chunkOrData?: Chunk | BufferSource | Blob | ReadableStream): Promise<Response> {
 		const action = 'uploads'
 		// A copy is made since the digest is appended to the query.
 		const u = new URL(location)
-		if (typeof digest === 'string') {
-			digest = Digest.parse(digest)
-		}
 
 		let chunk: Chunk | undefined
 		if (chunkOrData === undefined) {
@@ -368,7 +365,11 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 		}
 
 		u.searchParams.set('digest', digest.toString())
-		const req = this.exec<'PUT'>(u, { action, digest }, init)
+		return this.exec<'PUT'>(u, { action, digest }, init)
+	}
+
+	closeUpload(location: URL | string, digest: string | Digest, chunkOrData?: Chunk | BufferSource | Blob | ReadableStream) {
+		const req = this.#closeUpload(location, typeof digest === 'string' ? Digest.parse(digest) : digest, chunkOrData)
 		return result(req, res => Promise.resolve({ location: locationOf(res, this.ref.domain) }))
 	}
 
@@ -421,15 +422,17 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 	/**
 	 * Uploads a blob with a single request.
 	 *
-	 * If the registry does not support single request monolithic uploads,
-	 * a `location` is returned and uploads can be proceed using {@link uploadChunk}.
+	 * Not every registry supports it; the ones that do not answer `202 Accepted`
+	 * with a session to upload the blob to instead of storing it. The session is
+	 * then closed with an additional request, so the blob is uploaded either way
+	 * and the result is `201 Created` for both.
 	 *
 	 * @see Spec *{@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#single-post | Single POST}* `end-4b`.
+	 * @see {@link startUpload} to upload a blob that is too large to be held at once.
 	 *
 	 * @param digest Digest of the `chunk`.
 	 *
 	 * @returns `201 Created` on success.
-	 * @returns `202 Accepted` if the registry does not support single request monolithic uploads.
 	 */
 	upload(digest: string | Digest, data: BufferSource | Blob, pos?: number): Req<BlobsApiV2UploadRes>
 	upload(digest: string | Digest, chunk: Chunk): Req<BlobsApiV2UploadRes>
@@ -443,6 +446,8 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 		}
 
 		const u = `${this.urlPrefix}/uploads/?digest=${digest.toString()}`
+		const data = chunk.data
+		const d = digest
 		const req = this.exec<'POST'>(
 			u,
 			{ action, digest },
@@ -452,9 +457,24 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 					'Content-Length': chunk.length.toString(),
 					'Content-Type': 'application/octet-stream',
 				},
-				body: chunk.data,
+				body: data,
 			},
-		)
+		).then(res => {
+			if (res.status !== 202) {
+				return res
+			}
+
+			const l = res.headers.get('Location')
+			if (l === null) {
+				return res
+			}
+
+			// The registry opened a session instead of storing the blob, which
+			// means it does not accept a monolithic upload in a single request.
+			// Note that the data has to be sent again since the session is
+			// opened at the offset 0.
+			return this.#closeUpload(normalizeLocation(l, this.ref.domain), d, data)
+		})
 		return result(req, res => {
 			const l = res.headers.get('Location')
 			const location = l === null ? undefined : normalizeLocation(l, this.ref.domain)

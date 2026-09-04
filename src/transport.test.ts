@@ -187,6 +187,24 @@ describe('Accept', () => {
 		})
 		expect(terminal.cnt).to.eq(2)
 	})
+	it('adds an "Accept" header to a "HEAD" request', async () => {
+		const terminal = new Terminal((resource, init) => {
+			const req = new Request(resource, init)
+			expect(req.headers.get('Accept')).to.contain('foo')
+		})
+		const transport = new TransportChain([new Accept({ manifests: ['foo'] }), terminal])
+
+		await transport.fetch('https://x.com', {
+			method: 'HEAD',
+			endpoint: {
+				method: 'HEAD',
+				name: '',
+				resource: 'manifests',
+				reference: '',
+			},
+		})
+		expect(terminal.touched).to.be.true
+	})
 	it('does not add an "Accept" header to the request that is not a "GET"', async () => {
 		const terminal = new Terminal((resource, init) => {
 			const req = new Request(resource, init)
