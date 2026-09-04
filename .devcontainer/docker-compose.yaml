@@ -3,30 +3,28 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    command: sleep infinity
 
-    command: [ "sh", "-c", "while sleep 1000; do :; done" ]
-
+    user: "1000"
     privileged: true
+    environment:
+      - SHELL=/bin/zsh
 
     volumes:
-      - type: bind
-        source: ..
-        target: /workspace
-      - type: volume
-        source: registry
-        target: /var/lib/registry
+      - command.history:/commandhistory
 
-  registry:
-    image: ghcr.io/project-zot/zot:v2.1.0
+      - ..:/workspace
+      - ${HOME}/workspaces:/workspaces
 
-    volumes:
-      - type: bind
-        source: ./zot.json
-        target: /etc/zot/config.yml
-        read_only: true
-      - type: volume
-        source: registry
-        target: /var/lib/registry
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 8G
+          pids: 2048
+        reservations:
+          cpus: "2"
+          memory: 4G
 
 volumes:
-  registry:
+  command.history:
