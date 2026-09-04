@@ -25,10 +25,22 @@ test('export', () => {
 
 	expect(lib.RepoV2).to.be.exist
 	expect(lib.ClientV2).to.be.exist
+	expect(lib.TransportAuthorizer).to.be.exist
+	expect(lib.parseChallenge).to.be.exist
+	expect(lib.urlOf).to.be.exist
+	expect(lib.methodOf).to.be.exist
+	expect(lib.withUrl).to.be.exist
+	expect(lib.withHeaders).to.be.exist
+
+	expect(lib.ext.Catalog).to.be.exist
 
 	expectTypeExists<lib.MediaType>()
 	expectTypeExists<lib.ClientInit>()
 	expectTypeExists<lib.ErrorEntry>()
 	expectTypeExists<lib.ErrorResponse>()
 	expectTypeExists<lib.Unwrapped<object>>()
+	expectTypeExists<lib.ClientMixin>()
+	expectTypeExists<lib.Credential>()
+	expectTypeExists<lib.CredentialProvider>()
+	expectTypeExists<lib.Challenge>()
 })

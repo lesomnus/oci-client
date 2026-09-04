@@ -18,7 +18,7 @@ npm i @lesomnus/oci-client
 
 ### List Tags
 ```ts
-import { ClientV2 } from '@lesomns/oci-client'
+import { ClientV2 } from '@lesomnus/oci-client'
 
 const client = new ClientV2('index.docker.io')
 await client.ping()
@@ -35,7 +35,7 @@ console.log(v)
 
 ### Get Manifest
 ```ts
-import { ClientV2 } from '@lesomns/oci-client'
+import { ClientV2 } from '@lesomnus/oci-client'
 import { vnd } from '@lesomnus/oci-client/media-types'
 
 const client = new ClientV2('index.docker.io')
@@ -45,6 +45,35 @@ const opaque = await client.repo('library/node').manifests.get('latest').unwrap(
 const index = opaque.as(vnd.oci.image.indexV1)
 console.log(index?.manifests[0].platform.os)
 // "linux"
+```
+
+### Authenticate
+A credential is used to obtain a token from the authentication service the
+registry points to, or to answer a `Basic` challenge directly.
+The obtained token is reused for the following requests to the same repository.
+```ts
+import { ClientV2 } from '@lesomnus/oci-client'
+
+const client = new ClientV2('index.docker.io', {
+	credential: { username: 'j.doe', password: '...' },
+})
+
+// The credential can be resolved by the realm of the challenge.
+const other = new ClientV2('index.docker.io', {
+	credential: realm => (realm.endsWith('.docker.io') ? { username: 'j.doe', password: '...' } : undefined),
+})
+```
+
+### Use Extensions
+Extensions add APIs that are not a part of the distribution spec.
+```ts
+import { ClientV2, ext } from '@lesomnus/oci-client'
+
+const Client = ClientV2.with(ext.Catalog)
+const client = new Client('localhost:5000')
+
+const v = await client.catalog({ n: 10 }).unwrap()
+console.log(v.repositories)
 ```
 
 

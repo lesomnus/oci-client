@@ -1,7 +1,7 @@
 import { createSHA256 } from 'hash-wasm'
 import type { TestContext } from 'vitest'
 
-import { Accept, Chunk, ClientV2, Codes, FetchTransport, Unsecure } from '~/index'
+import { Accept, Chunk, ClientV2, Codes, FetchTransport, type Hasher, type ReqInit, type Transport, Unsecure } from '~/index'
 import { vnd } from '~/media-types'
 import T from '~/testutils'
 
@@ -455,5 +455,55 @@ describe.concurrent('api v2', async () => {
 		await upload.write(bytes.subarray(chunkSize, chunkSize * 2))
 		await upload.write(bytes.subarray(chunkSize * 2))
 		await upload.close()
+	})
+})
+
+describe('BlobsV2Upload', () => {
+	const Location = 'https://x.com/v2/foo/blobs/uploads/1'
+
+	// Records the length of every chunk it is given.
+	class Registry implements Transport {
+		chunks: number[] = []
+
+		constructor(private chunkMinLength?: number) {}
+
+		async fetch(resource: RequestInfo | URL, init?: ReqInit): Promise<Response> {
+			const req = new Request(resource instanceof URL ? resource.toString() : resource, init)
+			switch (req.method) {
+				case 'POST': {
+					const headers = new Headers({ Location })
+					if (this.chunkMinLength !== undefined) {
+						headers.set('OCI-Chunk-Min-Length', this.chunkMinLength.toString())
+					}
+					return new Response(null, { status: 202, headers })
+				}
+				case 'PATCH': {
+					this.chunks.push((await req.arrayBuffer()).byteLength)
+					return new Response(null, { status: 202, headers: { Location } })
+				}
+				default:
+					return new Response(null, { status: 201, headers: { Location } })
+			}
+		}
+	}
+
+	const hasher = (): Hasher => ({ name: 'sha256', update: () => {}, digest: () => 'a'.repeat(64) })
+
+	const upload = async (registry: Registry, data: Uint8Array<ArrayBuffer>) => {
+		const client = new ClientV2('x.com', { transport: registry })
+		const v = client.repo('foo').blobs.startUpload(hasher())
+		await v.write(data)
+		await v.close()
+	}
+
+	it('does not split the data below "OCI-Chunk-Min-Length"', async () => {
+		const registry = new Registry(1024)
+		await upload(registry, new Uint8Array(3000))
+		expect(registry.chunks).to.eql([3000])
+	})
+	it('uploads in a single chunk if the registry does not ask for a minimum', async () => {
+		const registry = new Registry()
+		await upload(registry, new Uint8Array(3000))
+		expect(registry.chunks).to.eql([3000])
 	})
 })
