@@ -133,6 +133,53 @@ All APIs are implemented as described in [Distribution spec v1.1.0](https://gith
 `end-4b` and `end-12` are answered differently depending on the registry and
 this client handles both, see [Tested Registries](#tested-registries).
 
+### Search
+
+Search the repositories of the registry.
+
+Searching is not a part of the distribution spec so every registry does it its
+own way. Each implementation is provided separately and they share the same
+`search` so the code that uses it does not have to know which one is behind.
+A field is left out where the registry does not report it.
+
+| Extension          | Registry                | API                                          |
+| ------------------ | ----------------------- | -------------------------------------------- |
+| `ext.search.Zot`   | *zot*                   | GraphQL on `/v2/_zot/ext/search`             |
+| `ext.search.V1`    | *Docker Hub* and alike  | `GET /v1/search?q=<term>&n=<integer>&page=<integer>` |
+
+```ts
+import { ClientV2, ext } from '@lesomnus/oci-client'
+
+const Client = ClientV2.with(ext.search.V1)
+const client = new Client('index.docker.io')
+
+const v = await client.search('nginx', { n: 3 }).unwrap()
+console.log(v.total, v.repositories[0])
+// 292148 {
+//   name: 'nginx',
+//   description: 'Official build of Nginx.',
+//   stars: 21369,
+//   downloads: 13328112634,
+//   official: true
+// }
+```
+
+`ext.search.Zot` also exposes `graphql` for the queries that `search` does not
+cover, such as the vulnerabilities or the referrers zot indexes.
+Note that the search extension has to be enabled on *zot*;
+`/v2/_oci/ext/discover` tells whether it is.
+
+```ts
+const Client = ClientV2.with(ext.search.Zot)
+const client = new Client('localhost:5000')
+
+const v = await client
+	.graphql<{ ImageList: { Results: { Tag: string }[] } }>('query($repo: String!) { ImageList(repo: $repo) { Results { Tag } } }', {
+		repo: 'library/node',
+	})
+	.unwrap()
+```
+
 ### Catalog
 
 List image repositories.

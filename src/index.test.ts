@@ -33,6 +33,8 @@ test('export', () => {
 	expect(lib.withHeaders).to.be.exist
 
 	expect(lib.ext.Catalog).to.be.exist
+	expect(lib.ext.search.Zot).to.be.exist
+	expect(lib.ext.search.V1).to.be.exist
 
 	expectTypeExists<lib.MediaType>()
 	expectTypeExists<lib.ClientInit>()
