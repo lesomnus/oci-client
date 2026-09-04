@@ -60,7 +60,7 @@ function evaluate(domain: string, init?: ClientInit): [string, Transport] {
 	let transport = init.transport
 	if (transport === undefined) {
 		transport = [
-			new TransportAuthorizer(), //
+			new TransportAuthorizer({ credential: init.credential }), //
 			new FetchTransport(),
 		]
 	}
