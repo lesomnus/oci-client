@@ -64,6 +64,31 @@ const other = new ClientV2('index.docker.io', {
 })
 ```
 
+### Know the Registry
+The spec does not require a registry to identify itself, so `detect` asks what
+it advertises first and falls back to how it answers. `flavor` is `undefined`
+where neither tells, which is the case for most of the hosted registries.
+```ts
+import { ClientV2 } from '@lesomnus/oci-client'
+
+const v = await new ClientV2('localhost:5000').detect().unwrap()
+console.log(v)
+// {
+//   flavor: 'zot',
+//   version: 'v2.1.20',
+//   specVersion: '1.1.1',
+//   extensions: [ { name: '_zot', url: '...', endpoints: [ '/v2/_zot/ext/search', ... ] } ]
+// }
+```
+
+`discover` asks only for the extensions, which is a fact the registry states
+rather than a guess. A registry that does not implement the discovery answers
+`404 Not Found`, which is reported as no extension.
+```ts
+const { extensions } = await client.discover().unwrap()
+const searchable = extensions.some(e => e.endpoints.includes('/v2/_zot/ext/search'))
+```
+
 ### Use Extensions
 Extensions add APIs that are not a part of the distribution spec.
 ```ts

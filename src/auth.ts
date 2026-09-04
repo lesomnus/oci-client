@@ -133,8 +133,9 @@ export class TransportAuthorizer implements TransportMiddleware {
 
 		const challenge = parseChallenge(text)
 		const authorization = await this.#authorize(challenge, next)
-		if (authorization === known) {
-			// It is the very authorization that was just rejected.
+		if (authorization === undefined || authorization === known) {
+			// There is nothing to answer the challenge with, or it is the very
+			// authorization that was just rejected, so the response stands.
 			return res
 		}
 
@@ -151,14 +152,18 @@ export class TransportAuthorizer implements TransportMiddleware {
 		return typeof this.#credential === 'function' ? this.#credential(realm) : this.#credential
 	}
 
-	async #authorize(challenge: Challenge, next: Transport): Promise<string> {
+	/**
+	 * Answers the challenge, or `undefined` if it cannot be answered, which is
+	 * not an error on its own: there may be no credential for the realm, and a
+	 * registry may refuse to issue a token for the scope it asked for itself.
+	 * `ghcr.io` challenges `/v2/` with a placeholder scope and denies a token
+	 * for it, for instance. The response that carried the challenge is the
+	 * answer in that case, which says it is unauthorized.
+	 */
+	async #authorize(challenge: Challenge, next: Transport): Promise<undefined | string> {
 		const credential = await this.#credentialFor(challenge.realm)
 		if (challenge.scheme === 'basic') {
-			if (credential === undefined) {
-				throw new Error(`no credential is given for the realm: ${challenge.realm}`)
-			}
-
-			return encodeBasic(credential)
+			return credential === undefined ? undefined : encodeBasic(credential)
 		}
 		if (challenge.scheme !== 'bearer') {
 			throw new Error(`unsupported authentication scheme: ${challenge.scheme}`)
@@ -175,16 +180,12 @@ export class TransportAuthorizer implements TransportMiddleware {
 		// The token endpoint authenticates with the credential itself, if any.
 		const res = await next.fetch(u, credential === undefined ? undefined : { headers: { Authorization: encodeBasic(credential) } })
 		if (res.status >= 400) {
-			throw new ResError(res, 'failed to obtain a token')
+			return undefined
 		}
 
 		// "access_token" is the OAuth2 form that some registries answer with.
 		const payload = await res.json()
 		const token = payload.token ?? payload.access_token
-		if (typeof token !== 'string') {
-			throw new ResError(res, 'response of the token endpoint does not have a token')
-		}
-
-		return `Bearer ${token}`
+		return typeof token === 'string' ? `Bearer ${token}` : undefined
 	}
 }

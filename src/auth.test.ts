@@ -156,11 +156,35 @@ describe('TransportAuthorizer', () => {
 		const res = await transport.fetch('https://x.com/v2/foo/tags/list', { endpoint: endpoint('foo') })
 		expect(res.status).to.eq(200)
 	})
-	it('fails if the scheme is "Basic" but there is no credential', async () => {
+	it('answers with the challenge if the scheme is "Basic" but there is no credential', async () => {
 		const registry = new Registry('never', { scheme: 'Basic' })
 		const transport = new TransportChain([new TransportAuthorizer(), registry])
 
-		await expect(transport.fetch('https://x.com/v2/foo/tags/list', { endpoint: endpoint('foo') })).rejects.toThrowError(/no credential/)
+		const res = await transport.fetch('https://x.com/v2/foo/tags/list', { endpoint: endpoint('foo') })
+		expect(res.status).to.eq(401)
+	})
+	it('answers with the challenge if the registry refuses to issue a token', async () => {
+		// `ghcr.io` challenges `/v2/` with a placeholder scope and then denies
+		// a token for it.
+		const registry: Transport = {
+			fetch(resource) {
+				const u = new URL(resource instanceof Request ? resource.url : resource)
+				if (u.origin === new URL(Realm).origin) {
+					return Promise.resolve(new Response(null, { status: 403 }))
+				}
+
+				return Promise.resolve(
+					new Response(null, {
+						status: 401,
+						headers: { 'WWW-Authenticate': challenge('Bearer', { realm: Realm, scope: 'repository:user/image:pull' }) },
+					}),
+				)
+			},
+		}
+		const transport = new TransportChain([new TransportAuthorizer(), registry])
+
+		const res = await transport.fetch('https://x.com/v2/', {})
+		expect(res.status).to.eq(401)
 	})
 	it('fails if the scheme is not supported', async () => {
 		const registry = new Registry('never', { scheme: 'Digest' })
