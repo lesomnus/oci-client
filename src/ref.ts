@@ -1,10 +1,5 @@
 import { Digest } from './digest'
-
-const Patterns = {
-	Domain: /^[^:/$\s]{1,}(:\d{1,})?$/,
-	Name: /^[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*(\/[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*)*$/,
-	Tag: /^[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}$/,
-}
+import Patterns from './regexp'
 
 function splitN(s: string, sep: string, n: number): string[] {
 	if (n === 0) {
@@ -57,7 +52,7 @@ export class Ref {
 
 		if (vs.length === 1) {
 			name = vs[0]
-		} else if ((vs[0].includes('.') || vs[0].includes(':')) && Patterns.Domain.test(vs[0])) {
+		} else if ((vs[0].includes('.') || vs[0].includes(':')) && Patterns.Reference.Domain.test(vs[0])) {
 			domain = vs[0]
 			name = vs.slice(1).join('/')
 		} else {
@@ -74,9 +69,17 @@ export class Ref {
 		readonly name: string,
 		extra?: { domain?: string; reference?: Reference },
 	) {
-		if (!Patterns.Name.test(name)) {
+		if (!Patterns.Reference.Name.test(name)) {
 			throw new Error('invalid name')
 		}
+		if (extra?.domain !== undefined && !Patterns.Reference.Domain.test(extra.domain)) {
+			throw new Error('invalid domain')
+		}
+		// A reference that is not a `Digest` is a tag.
+		if (typeof extra?.reference === 'string' && !Patterns.Reference.Tag.test(extra.reference)) {
+			throw new Error('invalid tag')
+		}
+
 		this.domain = extra?.domain
 		this.reference = extra?.reference
 	}

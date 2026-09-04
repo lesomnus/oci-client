@@ -34,6 +34,14 @@ describe('HashAlgorithm', () => {
 			})
 		})
 	})
+	describe('species', () => {
+		test('derived methods do not construct a `HashAlgorithm`', () => {
+			const v = HashAlgorithm.parse('a+b')
+			const mapped = v.map(c => c.toUpperCase())
+			expect(mapped).to.eql(['A', 'B'])
+			expect(mapped).not.to.be.instanceOf(HashAlgorithm)
+		})
+	})
 	describe('toString', () => {
 		test.each([
 			{ given: 'a', expected: 'a' },
@@ -81,6 +89,14 @@ describe('Digest', () => {
 			})
 			test.fails('only lowercases are allowed', () => {
 				Digest.parse(`sha512:${'A'.repeat(128)}`)
+			})
+		})
+		describe('separator is required', () => {
+			test.fails.each([
+				{ given: 'deadbeef' }, //
+				{ given: 'sha256' },
+			])('$given', ({ given }) => {
+				Digest.parse(given)
 			})
 		})
 		describe('encoded part cannot be empty', () => {

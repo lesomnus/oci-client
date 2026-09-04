@@ -88,6 +88,16 @@ describe('Ref', () => {
 			})
 		})
 	})
+	describe('invalid components', () => {
+		test.fails.each([
+			{ desc: 'tag with an invalid letter', name: 'foo', extra: { reference: 'b@r' } },
+			{ desc: 'tag starting with a period', name: 'foo', extra: { reference: '.bar' } },
+			{ desc: 'tag that is too long', name: 'foo', extra: { reference: `v${'0'.repeat(128)}` } },
+			{ desc: 'domain with a space', name: 'foo', extra: { domain: 'x .com' } },
+		])('$desc', ({ name, extra }) => {
+			new Ref(name, extra)
+		})
+	})
 	describe('toString', () => {
 		test.each([
 			{

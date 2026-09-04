@@ -12,6 +12,12 @@ const HashPatterns: Record<string, undefined | RegExp> = {
 }
 
 export class HashAlgorithm extends Array<string> {
+	// Methods like `map` construct their result with the species, which would
+	// invoke the constructor with a length instead of the components.
+	static get [Symbol.species]() {
+		return Array
+	}
+
 	static parse(text: string) {
 		const components = text.split(Patterns.Digest.AlgorithmSeparator)
 		return new HashAlgorithm(components)
@@ -43,6 +49,10 @@ export class Digest {
 
 	static parse(text: string) {
 		const i = text.indexOf(':')
+		if (i < 0) {
+			throw new SyntaxError('digest must be formed as "<algorithm>:<encoded>"')
+		}
+
 		const algo = HashAlgorithm.parse(text.slice(0, i))
 		const data = text.slice(i + 1)
 		return new Digest(algo, data)

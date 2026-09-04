@@ -392,7 +392,8 @@ describe.concurrent('api v2', async () => {
 			)
 		})
 		test('400', async () => {
-			const req = repo.referrers.get('foo')
+			// It is a well-formed digest but the registry does not know the algorithm.
+			const req = repo.referrers.get('foo:bar')
 			await expect(req).resolves.toBeTruthy()
 
 			const res = await req

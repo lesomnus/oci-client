@@ -37,7 +37,13 @@ export type Result<T extends {}> = ResBase & Unwrap<T>
 
 export type Req<T extends {}> = Promise<Result<T>> & Result<T>
 
-class ErrorEntries extends Array<ErrorEntry> {}
+class ErrorEntries extends Array<ErrorEntry> {
+	// Methods like `map` construct their result with the species, which would
+	// make an unrelated array be mistaken for an error response.
+	static get [Symbol.species]() {
+		return Array
+	}
+}
 
 export function wrap<T extends {}>(req: Promise<Response>, resolve: (res: Response) => Promise<T>) {
 	req = req.then(res => {
