@@ -43,21 +43,69 @@ export class TransportChain implements Transport, TransportMiddleware {
 	}
 }
 
-function normalizeReq(resource: RequestInfo | URL, init: ReqInit | undefined): [URL, ReqInit | undefined] {
-	// TODO: make init.method === 'GET' if it is undefined?
-	if (resource instanceof URL) {
-		return [resource, init]
+/**
+ * Returns a copy of the URL of the request.
+ * The returned URL can be modified freely since it is never shared with `resource`.
+ */
+export function urlOf(resource: RequestInfo | URL): URL {
+	if (resource instanceof Request) {
+		return new URL(resource.url)
 	}
 
-	let u: URL
-	if (typeof resource === 'string') {
-		u = new URL(resource)
-	} else {
-		u = new URL(resource.url)
-		init = new Request(resource, init)
+	return new URL(resource)
+}
+
+/**
+ * Returns the method of the request.
+ * Note that `init` takes precedence over `resource` as `fetch` does.
+ */
+export function methodOf(resource: RequestInfo | URL, init?: ReqInit): string {
+	if (init?.method !== undefined) {
+		return init.method
 	}
 
-	return [u, init] as const
+	return resource instanceof Request ? resource.method : 'GET'
+}
+
+/**
+ * Returns a new request of which URL is rewritten by `rewrite`.
+ * Neither `resource` nor the URL it holds is modified.
+ */
+export function withUrl(resource: RequestInfo | URL, rewrite: (url: URL) => void): RequestInfo | URL {
+	const u = urlOf(resource)
+	rewrite(u)
+
+	// `Request` is immutable so it has to be recreated with the rewritten URL.
+	return resource instanceof Request ? new Request(u, resource) : u
+}
+
+/**
+ * Returns a new request with the given headers set on top of the existing ones.
+ * Neither `resource` nor `init` is modified.
+ */
+export function withHeaders(
+	resource: RequestInfo | URL,
+	init: ReqInit | undefined,
+	headers: Record<string, string>,
+): [RequestInfo | URL, ReqInit | undefined] {
+	if (resource instanceof Request) {
+		// Properties of `Request` are defined on its prototype so they are lost
+		// if it is spread into an object; it is recreated instead.
+		const req = new Request(resource, init)
+		for (const [k, v] of Object.entries(headers)) {
+			req.headers.set(k, v)
+		}
+
+		// `endpoint` is not a part of `RequestInit` so it is not copied by `Request`.
+		return [req, init?.endpoint === undefined ? undefined : { endpoint: init.endpoint }]
+	}
+
+	const h = new Headers(init?.headers)
+	for (const [k, v] of Object.entries(headers)) {
+		h.set(k, v)
+	}
+
+	return [resource, { ...init, headers: h }]
 }
 
 /**
@@ -66,12 +114,14 @@ function normalizeReq(resource: RequestInfo | URL, init: ReqInit | undefined): [
  */
 export class Unsecure implements TransportMiddleware {
 	fetch(resource: RequestInfo | URL, init: ReqInit | undefined, next: Transport): Promise<Response> {
-		;[resource, init] = normalizeReq(resource, init)
-
-		if (resource.protocol !== 'https') {
-			resource.protocol = 'http'
-		}
-		return next.fetch(resource, init)
+		return next.fetch(
+			withUrl(resource, u => {
+				if (u.protocol === 'https:') {
+					u.protocol = 'http:'
+				}
+			}),
+			init,
+		)
 	}
 }
 
@@ -79,10 +129,12 @@ export class PathRewrite implements TransportMiddleware {
 	constructor(readonly rewrite: (path: string) => string) {}
 
 	fetch(resource: RequestInfo | URL, init: ReqInit | undefined, next: Transport): Promise<Response> {
-		;[resource, init] = normalizeReq(resource, init)
-
-		resource.pathname = this.rewrite(resource.pathname)
-		return next.fetch(resource, init)
+		return next.fetch(
+			withUrl(resource, u => {
+				u.pathname = this.rewrite(u.pathname)
+			}),
+			init,
+		)
 	}
 }
 
@@ -116,8 +168,7 @@ export class Accept implements TransportMiddleware {
 	}
 
 	fetch(resource: RequestInfo | URL, init: ReqInit | undefined, next: Transport): Promise<Response> {
-		;[resource, init] = normalizeReq(resource, init)
-		if (!(init?.method === undefined || init.method === 'GET')) {
+		if (methodOf(resource, init) !== 'GET') {
 			return next.fetch(resource, init)
 		}
 
@@ -125,13 +176,12 @@ export class Accept implements TransportMiddleware {
 		switch (init?.endpoint?.resource) {
 			case 'manifests':
 				v = this.#manifests
+				break
 		}
 		if (v === '') {
 			return next.fetch(resource, init)
 		}
 
-		const headers = new Headers(init?.headers)
-		headers.set('Accept', v)
-		return next.fetch(resource, { ...init, headers })
+		return next.fetch(...withHeaders(resource, init, { Accept: v }))
 	}
 }

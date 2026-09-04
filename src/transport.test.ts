@@ -86,6 +86,35 @@ describe('Unsecure', () => {
 		await transport.fetch('https://x.com')
 		expect(terminal.touched).to.be.true
 	})
+	it('does not change the protocol other than "https"', async () => {
+		const terminal = new Terminal(resource => {
+			expect(resource.toString()).to.eq('ftp://x.com/')
+		})
+		const transport = new TransportChain([new Unsecure(), terminal])
+
+		await transport.fetch('ftp://x.com')
+		expect(terminal.touched).to.be.true
+	})
+	it('does not modify the given URL', async () => {
+		const terminal = new Terminal()
+		const transport = new TransportChain([new Unsecure(), terminal])
+
+		const u = new URL('https://x.com')
+		await transport.fetch(u)
+		expect(u.toString()).to.eq('https://x.com/')
+	})
+	it('preserves the body and the method of a `Request`', async () => {
+		let req: Request | undefined
+		const terminal = new Terminal((resource, init) => {
+			req = new Request(resource, init)
+		})
+		const transport = new TransportChain([new Unsecure(), terminal])
+
+		await transport.fetch(new Request('https://x.com/a', { method: 'POST', body: 'foo' }))
+		expect(req?.url).to.eq('http://x.com/a')
+		expect(req?.method).to.eq('POST')
+		await expect(req?.text()).resolves.toBe('foo')
+	})
 })
 
 describe('PathPrefix', () => {
@@ -157,5 +186,40 @@ describe('Accept', () => {
 			},
 		})
 		expect(terminal.cnt).to.eq(2)
+	})
+	it('does not add an "Accept" header to the request that is not a "GET"', async () => {
+		const terminal = new Terminal((resource, init) => {
+			const req = new Request(resource, init)
+			expect(req.headers.get('Accept')).to.be.null
+		})
+		const transport = new TransportChain([new Accept({ manifests: ['foo'] }), terminal])
+
+		await transport.fetch(new Request('https://x.com', { method: 'PUT' }), {
+			endpoint: {
+				method: 'PUT',
+				name: '',
+				resource: 'manifests',
+				reference: '',
+			},
+		})
+		expect(terminal.touched).to.be.true
+	})
+	it('keeps the headers of a `Request`', async () => {
+		const terminal = new Terminal((resource, init) => {
+			const req = new Request(resource, init)
+			expect(req.headers.get('Accept')).to.contain('foo')
+			expect(req.headers.get('X-Kept')).to.eq('42')
+		})
+		const transport = new TransportChain([new Accept({ manifests: ['foo'] }), terminal])
+
+		await transport.fetch(new Request('https://x.com', { headers: { 'X-Kept': '42' } }), {
+			endpoint: {
+				method: 'GET',
+				name: '',
+				resource: 'manifests',
+				reference: '',
+			},
+		})
+		expect(terminal.touched).to.be.true
 	})
 })
