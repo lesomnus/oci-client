@@ -7,7 +7,7 @@ export type CatalogRes = {
 
 export function Catalog<T extends ClientExtension>(
 	// FIXME: default value does not need if ClientV2.with is implemented as intended
-	//@ts-ignore
+	//@ts-expect-error
 	Base: T = ClientBase,
 ) {
 	return class Catalog extends Base {

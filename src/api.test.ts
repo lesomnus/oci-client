@@ -1,5 +1,5 @@
 import { createSHA256 } from 'hash-wasm'
-import type { TaskContext } from 'vitest'
+import type { TestContext } from 'vitest'
 
 import { Accept, Chunk, ClientV2, Codes, FetchTransport, Unsecure } from '~/index'
 import { vnd } from '~/media-types'
@@ -37,12 +37,12 @@ describe.concurrent('api v2', async () => {
 		await repo.manifests.put(artifact.digest, vnd.oci.image.manifestV1, artifact.bytes).unwrap()
 	}
 
-	const getRepo = (ctx: TaskContext, name?: string) =>
+	const getRepo = (ctx: TestContext, name?: string) =>
 		client.repo(`test-${ctx.task.file.projectName}/${name ?? ctx.task.suite?.name.slice(0, 7).trim()}`)
 
 	test(title('end-1', 'GET', '/'), async () => {
 		const req = client.ping()
-		await expect(req).resolves.ok
+		await expect(req).resolves.toBeTruthy()
 
 		const res = await req
 		expect(res.raw.status).to.eq(200)
@@ -52,7 +52,7 @@ describe.concurrent('api v2', async () => {
 			const { digest } = T.asset.Images['v0.1.0']
 
 			const req = repo.blobs.exists(digest)
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(200)
@@ -60,7 +60,7 @@ describe.concurrent('api v2', async () => {
 		})
 		test('404', async () => {
 			const req = repo.blobs.exists(T.asset.HashOfNotExists)
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(404)
@@ -72,7 +72,7 @@ describe.concurrent('api v2', async () => {
 			const { data, digest } = T.asset.Images['v0.1.0']
 
 			const req = repo.blobs.get(digest)
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(200)
@@ -82,7 +82,7 @@ describe.concurrent('api v2', async () => {
 		})
 		test('404', async () => {
 			const req = repo.blobs.get(T.asset.HashOfNotExists)
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(404)
@@ -97,7 +97,7 @@ describe.concurrent('api v2', async () => {
 			const { ref } = T.asset.Images['v0.1.0']
 
 			const req = repo.manifests.exists(ref)
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(200)
@@ -105,7 +105,7 @@ describe.concurrent('api v2', async () => {
 		})
 		test('404', async () => {
 			const req = repo.manifests.exists('not-exists')
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(404)
@@ -117,13 +117,13 @@ describe.concurrent('api v2', async () => {
 			const { ref, manifest } = T.asset.Images['v0.1.0']
 
 			const req = repo.manifests.get(ref)
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(200)
 
 			const result = res.unwrap()
-			await expect(result).resolves.ok
+			await expect(result).resolves.toBeTruthy()
 
 			const opaque = await result
 			const v = opaque.as(vnd.oci.image.manifestV1)
@@ -132,7 +132,7 @@ describe.concurrent('api v2', async () => {
 		})
 		test('404', async () => {
 			const req = repo.manifests.get('not-exists')
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(404)
@@ -146,11 +146,11 @@ describe.concurrent('api v2', async () => {
 		test('202', async ctx => {
 			const repo = getRepo(ctx)
 			const req = repo.blobs.initUpload()
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(202)
-			await expect(res.unwrap()).resolves.ok
+			await expect(res.unwrap()).resolves.toBeTruthy()
 
 			const v = await res.unwrap()
 			expect(v.location).to.be.exist
@@ -162,11 +162,11 @@ describe.concurrent('api v2', async () => {
 
 			const repo = getRepo(ctx)
 			const req = repo.blobs.upload(digest, chunk)
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(201)
-			await expect(res.unwrap()).resolves.ok
+			await expect(res.unwrap()).resolves.toBeTruthy()
 
 			const v = await res.unwrap()
 			expect(v.location).to.be.exist
@@ -180,11 +180,11 @@ describe.concurrent('api v2', async () => {
 			const { location } = await repo.blobs.initUpload().unwrap()
 
 			const req = repo.blobs.uploadChunk(location, chunk)
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(202)
-			await expect(res.unwrap()).resolves.ok
+			await expect(res.unwrap()).resolves.toBeTruthy()
 
 			const v = await res.unwrap()
 			expect(v.location).to.be.exist
@@ -196,7 +196,7 @@ describe.concurrent('api v2', async () => {
 			const { location } = await repo.blobs.initUpload().unwrap()
 
 			const req = repo.blobs.uploadChunk(location, chunk.withPos(1))
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(416)
@@ -214,11 +214,11 @@ describe.concurrent('api v2', async () => {
 			const { location } = await repo.blobs.initUpload().unwrap()
 
 			const req = repo.blobs.closeUpload(location, digest, chunk)
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(201)
-			await expect(res.unwrap()).resolves.ok
+			await expect(res.unwrap()).resolves.toBeTruthy()
 
 			const v = await res.unwrap()
 			expect(v.location).to.be.exist
@@ -234,7 +234,7 @@ describe.concurrent('api v2', async () => {
 
 			const res = await repo.manifests.put(ref, manifest.mediaType, JSON.stringify(manifest))
 			expect(res.raw.status).to.eq(201)
-			await expect(res.unwrap()).resolves.ok
+			await expect(res.unwrap()).resolves.toBeTruthy()
 
 			const v = await res.unwrap()
 			expect(v.location).not.to.be.empty
@@ -243,13 +243,13 @@ describe.concurrent('api v2', async () => {
 	describe.concurrent(title('end-8a', 'GET', 'tags/list'), () => {
 		test('200', async () => {
 			const req = repo.tags.list()
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(200)
 
 			const result = res.unwrap()
-			await expect(result).resolves.ok
+			await expect(result).resolves.toBeTruthy()
 
 			const v = await result
 			expect(v.name).to.eq(Repo)
@@ -257,7 +257,7 @@ describe.concurrent('api v2', async () => {
 		})
 		test('404', async () => {
 			const req = client.repo('test/end-8a-not-exists').tags.list()
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(404)
@@ -270,13 +270,13 @@ describe.concurrent('api v2', async () => {
 	describe.concurrent(title('end-8b', 'GET', 'tags/list?n=_&last=_'), () => {
 		test('200', async () => {
 			const req = repo.tags.list({ n: 2, last: 'v0.2.0' })
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(200)
 
 			const result = res.unwrap()
-			await expect(result).resolves.ok
+			await expect(result).resolves.toBeTruthy()
 
 			const v = await result
 			expect(v.name).to.eq(Repo)
@@ -286,7 +286,7 @@ describe.concurrent('api v2', async () => {
 		test('404', async ctx => {
 			const repo = getRepo(ctx, 'end-8b-not-exists')
 			const req = repo.tags.list({ n: 2, last: 'v0.2.0' })
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(404)
@@ -310,17 +310,17 @@ describe.concurrent('api v2', async () => {
 			await repo.manifests.put(digest, vnd.oci.image.manifestV1, JSON.stringify(image.manifest)).unwrap()
 
 			const req = repo.manifests.delete(digest)
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(202)
 
 			const result = res.unwrap()
-			await expect(result).resolves.ok
+			await expect(result).resolves.toBeTruthy()
 		})
 		test('404', async () => {
 			const req = repo.manifests.delete(T.asset.HashOfNotExists)
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(404)
@@ -334,17 +334,17 @@ describe.concurrent('api v2', async () => {
 			await repo.blobs.upload(digest, chunk).unwrap()
 
 			const req = repo.blobs.delete(digest)
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(202)
 
 			const result = res.unwrap()
-			await expect(result).resolves.ok
+			await expect(result).resolves.toBeTruthy()
 		})
 		test('404', async () => {
 			const req = repo.blobs.delete(T.asset.HashOfNotExists)
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(404)
@@ -356,13 +356,13 @@ describe.concurrent('api v2', async () => {
 
 			const repo = getRepo(ctx)
 			const req = repo.blobs.mount(digest, ref)
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(201)
 
 			const result = res.unwrap()
-			await expect(result).resolves.ok
+			await expect(result).resolves.toBeTruthy()
 		})
 	})
 	describe.concurrent(title('end-12a', 'GET', 'referrers/<digest>'), () => {
@@ -370,13 +370,13 @@ describe.concurrent('api v2', async () => {
 			const { digest } = T.asset.Images['v0.1.0']
 
 			const req = repo.referrers.get(digest)
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(200)
 
 			const result = res.unwrap()
-			await expect(result).resolves.ok
+			await expect(result).resolves.toBeTruthy()
 
 			const v = await result
 			expect(v.manifests).to.be.lengthOf(2)
@@ -393,7 +393,7 @@ describe.concurrent('api v2', async () => {
 		})
 		test('400', async () => {
 			const req = repo.referrers.get('foo')
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(400)
@@ -405,13 +405,13 @@ describe.concurrent('api v2', async () => {
 			const artifact = T.asset.Artifacts['application/foo']
 
 			const req = repo.referrers.get(digest, { artifactType: artifact.manifest.artifactType })
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(200)
 
 			const result = res.unwrap()
-			await expect(result).resolves.ok
+			await expect(result).resolves.toBeTruthy()
 
 			const v = await result
 			expect(v.manifests).to.be.lengthOf(1)
@@ -430,11 +430,11 @@ describe.concurrent('api v2', async () => {
 			;({ location } = await repo.blobs.uploadChunk(location, new Chunk(Uint8Array.from([1, 2, 3]))).unwrap())
 
 			const req = repo.blobs.getUploadStatus(location)
-			await expect(req).resolves.ok
+			await expect(req).resolves.toBeTruthy()
 
 			const res = await req
 			expect(res.raw.status).to.eq(204)
-			await expect(res.unwrap()).resolves.ok
+			await expect(res.unwrap()).resolves.toBeTruthy()
 
 			const v = await res.unwrap()
 			expect(v.location).to.be.exist

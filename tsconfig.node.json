@@ -1,14 +1,14 @@
 {
 	"compilerOptions": {
 		"composite": true,
-		"module": "ESNext",
+		"module": "preserve",
 		"target": "ESNext",
 		"skipLibCheck": true,
 
-		"moduleResolution": "bundler",
 		"allowSyntheticDefaultImports": true,
+		"verbatimModuleSyntax": true,
 
 		"strict": true
 	},
-	"include": ["vite.config.ts", "scripts"]
+	"include": ["vite.config.ts"]
 }

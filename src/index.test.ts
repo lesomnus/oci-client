@@ -1,6 +1,6 @@
 import * as lib from './index'
 
-function expectTypeExists<T>() {}
+function expectTypeExists<_T>() {}
 
 test('export', () => {
 	expect(lib.Chunk).to.be.exist

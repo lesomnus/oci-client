@@ -2,7 +2,7 @@ import { sha256 } from 'hash-wasm'
 
 import { Digest } from '../digest'
 
-export function encodeString(data: string): Uint8Array {
+export function encodeString(data: string): Uint8Array<ArrayBuffer> {
 	const encoder = new TextEncoder()
 	return encoder.encode(data)
 }

@@ -3,7 +3,7 @@ export class Range {
 	static parse(text: string): Range {
 		const i = text.indexOf('-')
 		if (i === 0) {
-			const p = Number.parseInt(text)
+			const p = Number.parseInt(text, 10)
 			if (Number.isNaN(p)) {
 				throw new SyntaxError('invalid suffix')
 			}
@@ -14,7 +14,7 @@ export class Range {
 		const a = text.slice(0, i)
 		const b = text.slice(i + 1)
 
-		const p1 = Number.parseInt(a)
+		const p1 = Number.parseInt(a, 10)
 		if (Number.isNaN(p1)) {
 			throw new SyntaxError('invalid first pos')
 		}
@@ -22,7 +22,7 @@ export class Range {
 			return new Range(p1)
 		}
 
-		const p2 = Number.parseInt(b)
+		const p2 = Number.parseInt(b, 10)
 		if (Number.isNaN(p2)) {
 			throw new SyntaxError('invalid last pos')
 		}

@@ -8,13 +8,13 @@ describe('result', () => {
 		const res = new Response(null, { status: 200 })
 		const req = Promise.resolve(res)
 		const rst = result(req, emptyValue)
-		await expect(rst).resolves.ok
+		await expect(rst).resolves.toBeTruthy()
 	})
 	it('resolves opaque result on client error response', async () => {
 		const res = new Response(null, { status: 400 })
 		const req = Promise.resolve(res)
 		const rst = result(req, emptyValue)
-		await expect(rst).resolves.ok
+		await expect(rst).resolves.toBeTruthy()
 	})
 	it('rejects `ResError` on server error response', async () => {
 		const res = new Response(null, { status: 500 })

@@ -5,7 +5,7 @@ import type { vnd } from './media-types'
 import type { MediaType } from './media-types/t'
 import { Range } from './range'
 import { Ref, type Reference } from './ref'
-import { type Probe, type Req, probe, result } from './result'
+import { type Probe, probe, type Req, result } from './result'
 import type { Transport } from './transport'
 
 /**
@@ -161,7 +161,7 @@ class ApiBase<R extends string> {
 
 	protected _delete(resource: string, endpoint: Ep<R, 'DELETE'>, init?: RequestInit) {
 		const req = this.exec(resource, endpoint, { ...init, method: 'DELETE' })
-		return result(req, res => Promise.resolve({}))
+		return result(req, () => Promise.resolve({}))
 	}
 }
 
@@ -245,7 +245,7 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 			const { headers } = res
 			const l = headers.get('Location') as string
 			const location = normalizeLocation(l, this.ref.domain)
-			const chunkMinLength = Number.parseInt(headers.get('OCI-Chunk-Min-Length') ?? '')
+			const chunkMinLength = Number.parseInt(headers.get('OCI-Chunk-Min-Length') ?? '', 10)
 
 			return Promise.resolve({ location, chunkMinLength })
 		})
@@ -438,7 +438,7 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 		)
 		return result(req, res => {
 			const l = res.headers.get('Location')
-			let location: URL | undefined = undefined
+			let location: URL | undefined
 			if (l !== null) {
 				location = normalizeLocation(l, this.ref.domain)
 			}

@@ -8,18 +8,18 @@
 	},
 	"license": "Apache-2.0",
 	"type": "module",
-	"main": "./dist/main.cjs.js",
+	"main": "./dist/main.cjs",
 	"module": "./dist/main.js",
 	"exports": {
 		".": {
-			"require": "./dist/main.cjs.js",
+			"types": "./dist/index.d.ts",
 			"import": "./dist/main.js",
-			"types": "./dist/index.d.ts"
+			"require": "./dist/main.cjs"
 		},
 		"./media-types": {
-			"require": "./dist/media-types.cjs.js",
+			"types": "./dist/media-types/index.d.ts",
 			"import": "./dist/media-types.js",
-			"types": "./dist/media-types/index.d.ts"
+			"require": "./dist/media-types.cjs"
 		}
 	},
 	"scripts": {
@@ -29,19 +29,19 @@
 		"check": "biome check --write ."
 	},
 	"devDependencies": {
-		"@biomejs/biome": "1.8.3",
-		"@types/node": "^20.14.11",
-		"@vitest/browser": "^2.0.3",
-		"@vitest/coverage-istanbul": "^2.0.3",
-		"@vitest/ui": "^2.0.3",
-		"hash-wasm": "^4.11.0",
-		"playwright": "^1.45.3",
-		"tsx": "^4.16.2",
-		"typescript": "^5.2.2",
-		"vite": "^5.3.1",
-		"vite-plugin-dts": "^3.9.1",
-		"vite-tsconfig-paths": "^5.0.0",
-		"vitest": "^2.0.3",
-		"zx": "^8.1.4"
+		"@biomejs/biome": "2.5.12",
+		"@types/node": "^26.4.1",
+		"@typescript/typescript6": "^6.0.2",
+		"@vitest/browser": "^5.0.0",
+		"@vitest/browser-playwright": "^5.0.0",
+		"@vitest/coverage-istanbul": "^5.0.0",
+		"@vitest/ui": "^5.0.0",
+		"hash-wasm": "^4.12.0",
+		"playwright": "^1.62.1",
+		"typescript": "^7.0.2",
+		"vite": "^8.2.2",
+		"vite-plugin-dts": "^5.1.0",
+		"vitest": "^5.0.0",
+		"zx": "^8.8.5"
 	}
 }

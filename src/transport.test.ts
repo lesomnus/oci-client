@@ -31,7 +31,7 @@ describe('TransportChain', () => {
 		const transport = new TransportChain([mw, mw, mw, terminal])
 
 		const req = transport.fetch('')
-		await expect(req).resolves.ok
+		await expect(req).resolves.toBeTruthy()
 
 		const res = await req
 		expect(res.body).to.eq(null)
@@ -66,7 +66,7 @@ describe('TransportChain', () => {
 		])
 
 		const req = transport.fetch('')
-		await expect(req).resolves.ok
+		await expect(req).resolves.toBeTruthy()
 
 		const res = await req
 		expect(res.body).to.eq(null)

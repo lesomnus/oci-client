@@ -1,8 +1,7 @@
-import { Catalog } from './catalog'
-
 import { ClientV2, FetchTransport, Unsecure } from '~/index'
 import { vnd } from '~/media-types'
 import T from '~/testutils'
+import { Catalog } from './catalog'
 
 describe.concurrent('ext catalog', async () => {
 	const Client = ClientV2.with(Catalog())
