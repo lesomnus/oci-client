@@ -1,2 +1,6 @@
 export * as cncf from './cncf'
+export * as dev from './dev'
+export * from './docker'
+export * from './in-toto'
 export * as oci from './oci'
+export * from './wasm'
