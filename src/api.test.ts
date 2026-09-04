@@ -458,6 +458,68 @@ describe.concurrent('api v2', async () => {
 	})
 })
 
+describe('ReferrersApiV2 fallback', () => {
+	const Subject = `sha256:${'a'.repeat(64)}`
+	const Tag = `sha256-${'a'.repeat(64)}`
+
+	const descriptor = (artifactType: string) => ({
+		mediaType: vnd.oci.image.manifestV1,
+		digest: `sha256:${'b'.repeat(64)}`,
+		size: 1,
+		artifactType,
+	})
+
+	// Answers `404 Not Found` for the Referrers API like a registry that does
+	// not implement it, and serves `tagged` by the referrers tag schema.
+	const registry = (tagged?: object): Transport => ({
+		fetch(resource) {
+			const u = new URL(resource instanceof Request ? resource.url : resource)
+			if (u.pathname.includes('/referrers/')) {
+				return Promise.resolve(new Response(null, { status: 404 }))
+			}
+			if (u.pathname.endsWith(`/manifests/${Tag}`) && tagged !== undefined) {
+				return Promise.resolve(Response.json(tagged))
+			}
+
+			return Promise.resolve(new Response(null, { status: 404 }))
+		},
+	})
+
+	const referrers = (transport: Transport) => new ClientV2('x.com', { transport }).repo('foo').referrers
+
+	it('lists the referrers by the tag schema', async () => {
+		const v = await referrers(
+			registry({
+				schemaVersion: 2,
+				mediaType: vnd.oci.image.indexV1,
+				manifests: [descriptor('application/foo'), descriptor('application/bar')],
+			}),
+		)
+			.get(Subject)
+			.unwrap()
+
+		expect(v.manifests).to.have.lengthOf(2)
+	})
+	it('filters by the artifact type', async () => {
+		const v = await referrers(
+			registry({
+				schemaVersion: 2,
+				mediaType: vnd.oci.image.indexV1,
+				manifests: [descriptor('application/foo'), descriptor('application/bar')],
+			}),
+		)
+			.get(Subject, { artifactType: 'application/foo' })
+			.unwrap()
+
+		expect(v.manifests).to.have.lengthOf(1)
+		expect(v.manifests[0].artifactType).to.eq('application/foo')
+	})
+	it('reports an empty list if the tag is not maintained', async () => {
+		const v = await referrers(registry()).get(Subject).unwrap()
+		expect(v.manifests).to.have.lengthOf(0)
+	})
+})
+
 describe('BlobsV2Upload', () => {
 	const Location = 'https://x.com/v2/foo/blobs/uploads/1'
 

@@ -2,7 +2,7 @@ import { Chunk } from './chunk'
 import { Digest, type Hasher } from './digest'
 import type { Endpoint } from './endpoint'
 import { ResError } from './error'
-import type { vnd } from './media-types'
+import { vnd } from './media-types'
 import type { MediaType } from './media-types/t'
 import { makeParams } from './params'
 import { Range } from './range'
@@ -657,21 +657,56 @@ export class ReferrersApiV2 extends ApiBase<'referrers'> {
 	}
 
 	/**
+	 * Lists the referrers by the tag of the referrers tag schema, which is
+	 * `<algorithm>-<encoded>` of the digest of the subject.
+	 * It is how the referrers are listed on a registry that does not implement
+	 * the Referrers API. An empty list is reported if the tag is not there,
+	 * since the tag is maintained by whoever pushed the referrers.
+	 *
+	 * @see Spec *{@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#backwards-compatibility | Backwards Compatibility}*.
+	 */
+	async #byTag(digest: Digest, opts?: ReferrersApiV2GetOpts): Promise<Response> {
+		const reference = `${digest.algorithm.toString()}-${digest.encoded}`
+		const u = `https://${this.ref.domain}/v2/${this.ref.name}/manifests/${reference}`
+		const res = await this.transport.fetch(u, {
+			method: 'GET',
+			headers: { Accept: vnd.oci.image.indexV1 },
+			endpoint: { method: 'GET', name: this.ref.name, resource: 'manifests', reference },
+		})
+		if (res.status >= 400 && res.status !== 404) {
+			return res
+		}
+
+		const index: ReferrersApiV2GetRes =
+			res.status === 404 //
+				? { schemaVersion: 2, mediaType: vnd.oci.image.indexV1, manifests: [] }
+				: await res.json()
+
+		// The API filters by the artifact type on the registry but the tag holds
+		// every referrer of the subject, so it is filtered here instead.
+		const { artifactType } = opts ?? {}
+		const manifests = artifactType === undefined ? index.manifests : index.manifests.filter(m => m.artifactType === artifactType)
+
+		return Response.json({ ...index, manifests })
+	}
+
+	/**
 	 * Retrieves a list of referrers identified by `digest`.
 	 *
-	 * If the registry supports referrers APIs, `404 Not Found` is NOT returned.
+	 * A registry that does not implement the API answers `404 Not Found`, in
+	 * which case the referrers are listed by the tag schema instead, so the
+	 * result is a list either way.
 	 *
 	 * @see Spec {@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#listing-referrers | Listing Referrers} `end-12`.
 	 *
 	 * @returns `200 OK` on success.
 	 */
 	get(digest: string | Digest, opts?: ReferrersApiV2GetOpts): Req<ReferrersApiV2GetRes> {
-		if (typeof digest === 'string') {
-			digest = Digest.parse(digest)
-		}
+		const d = typeof digest === 'string' ? Digest.parse(digest) : digest
 
-		const u = `${this.#u(digest)}${makeParams(opts)}`
-		return this._get(u, { ...opts })
+		const u = `${this.#u(d)}${makeParams(opts)}`
+		const req = this.exec<'GET'>(u, { ...opts }, { method: 'GET' }).then(res => (res.status === 404 ? this.#byTag(d, opts) : res))
+		return result<ReferrersApiV2GetRes>(req, res => res.json())
 	}
 }
 
