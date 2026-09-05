@@ -10,6 +10,8 @@ on:
 
 permissions:
   contents: read
+  # ghcr takes the token a workflow is given, so nothing has to be held for it.
+  packages: write
 
 jobs:
   hosted:
@@ -32,3 +34,5 @@ jobs:
           # skipped; the ones that read a public image still run.
           REGISTRY_HUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           REGISTRY_HUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          REGISTRY_GHCR_USERNAME: ${{ github.repository_owner }}
+          REGISTRY_GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}

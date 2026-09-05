@@ -37,6 +37,18 @@ export const PrivateRepo = import.meta.env.REGISTRY_PRIVATE_REPO ?? 'private/thi
 export const HubRepo = import.meta.env.REGISTRY_HUB_REPO ?? 'lesomnus/oci-client-test'
 
 /**
+ * Credential for ghcr.io, which is the token a workflow is given rather than
+ * one that is held anywhere. Without it the tests that write are skipped.
+ */
+export const GhcrCredential =
+	import.meta.env.REGISTRY_GHCR_USERNAME && import.meta.env.REGISTRY_GHCR_TOKEN
+		? { username: import.meta.env.REGISTRY_GHCR_USERNAME, password: import.meta.env.REGISTRY_GHCR_TOKEN }
+		: undefined
+
+/** Repository on ghcr.io that the tests push to. */
+export const GhcrRepo = import.meta.env.REGISTRY_GHCR_REPO ?? 'lesomnus/oci-client-test'
+
+/**
  * Behaviors that not every registry has, either because the spec leaves them
  * optional or because the implementation does not comply with it.
  * The tests cannot expect them from every registry so they are declared here.

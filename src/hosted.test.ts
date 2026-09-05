@@ -94,6 +94,41 @@ describe.skipIf(!enabled)('hosted registries', () => {
 		})
 	})
 
+	describe.skipIf(T.env.GhcrCredential === undefined)('ghcr.io with a credential', () => {
+		const repo = new ClientV2('ghcr.io', { credential: T.env.GhcrCredential }).repo(T.env.GhcrRepo)
+
+		// ghcr serves no delete, so everything pushed here is fixed: the same
+		// bytes digest the same and a rerun leaves no new version behind.
+		const layer = encode('oci-client conformance test\n')
+
+		test('accepts a blob and the manifest that points at it', async () => {
+			const layerDigest = await sha256(layer)
+			await repo.blobs.upload(vnd.oci.empty.digest, new Chunk(encode('{}'))).unwrap()
+			expect((await repo.blobs.upload(layerDigest, new Chunk(layer)).unwrap()).raw.status).to.eq(201)
+
+			const manifest = {
+				schemaVersion: 2,
+				mediaType: vnd.oci.image.manifestV1,
+				config: vnd.oci.empty,
+				layers: [{ mediaType: 'application/octet-stream', digest: layerDigest.toString(), size: layer.byteLength }],
+			}
+			const res = await repo.manifests.put('v1', vnd.oci.image.manifestV1, encode(JSON.stringify(manifest)))
+			expect(res.raw.status).to.eq(201)
+		})
+		test('serves back what was pushed', async () => {
+			const layerDigest = await sha256(layer)
+
+			expect((await repo.tags.list().unwrap()).tags).to.contain('v1')
+			expect((await repo.manifests.exists('v1')).ok).to.be.true
+
+			const v = await repo.manifests.get('v1').unwrap()
+			expect(v.as(vnd.oci.image.manifestV1)?.layers[0].digest).to.eq(layerDigest.toString())
+
+			const blob = await repo.blobs.get(layerDigest)
+			expect(blob.raw.status).to.eq(200)
+		})
+	})
+
 	describe.skipIf(credential === undefined)('a repository that is not public', () => {
 		const Repo = T.env.HubRepo
 		const authorized = new ClientV2('index.docker.io', { credential }).repo(Repo)
@@ -138,7 +173,9 @@ describe.skipIf(!enabled)('hosted registries', () => {
 			expect(v.tags).to.have.lengthOf.at.most(1)
 		})
 		test('accepts a blob uploaded in chunks', async () => {
-			const data = encode(`chunked ${Date.now()}\n`)
+			// The content is fixed so that a rerun pushes the very same digest
+			// and leaves nothing behind; neither registry lets a blob be deleted.
+			const data = encode('oci-client conformance chunk\n')
 			const digest = await sha256(data)
 
 			const { location } = await authorized.blobs.initUpload().unwrap()
@@ -149,7 +186,7 @@ describe.skipIf(!enabled)('hosted registries', () => {
 			expect((await authorized.blobs.exists(digest)).ok).to.be.true
 		})
 		test('accepts a blob uploaded in a single request', async () => {
-			const data = encode(`single ${Date.now()}\n`)
+			const data = encode('oci-client conformance single\n')
 			const digest = await sha256(data)
 
 			const res = await authorized.blobs.upload(digest, new Chunk(data))
