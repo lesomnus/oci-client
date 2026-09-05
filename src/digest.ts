@@ -43,9 +43,47 @@ export class HashAlgorithm extends Array<string> {
 	}
 }
 
+/** Algorithms that {@link Digest.of} can compute. */
+export type DigestAlgorithm = 'sha256' | 'sha512'
+
+const SubtleAlgorithms: Record<DigestAlgorithm, string> = {
+	sha256: 'SHA-256',
+	sha512: 'SHA-512',
+}
+
+function hex(v: ArrayBuffer): string {
+	return Array.from(new Uint8Array(v))
+		.map(b => b.toString(16).padStart(2, '0'))
+		.join('')
+}
+
 export class Digest {
 	#algorithm: HashAlgorithm
 	#encoded: string
+
+	/**
+	 * Digests the given data, which is what a blob has to be identified by
+	 * before it can be pushed.
+	 *
+	 * Note that it is computed by the Web Crypto API, which a browser serves
+	 * only in a secure context; use a {@link Hasher} with {@link BlobsApiV2.startUpload}
+	 * for the data that is too large to be held at once.
+	 *
+	 * @example
+	 * ```ts
+	 * const data = new TextEncoder().encode('...')
+	 * await repo.blobs.upload(await Digest.of(data), data).unwrap()
+	 * ```
+	 */
+	static async of(data: BufferSource | Blob, algorithm: DigestAlgorithm = 'sha256'): Promise<Digest> {
+		if (globalThis.crypto?.subtle === undefined) {
+			throw new Error('Web Crypto is not available, which a browser serves only in a secure context')
+		}
+
+		const bytes = data instanceof Blob ? await data.arrayBuffer() : data
+		const v = await globalThis.crypto.subtle.digest(SubtleAlgorithms[algorithm], bytes)
+		return new Digest(algorithm, hex(v))
+	}
 
 	static parse(text: string) {
 		const i = text.indexOf(':')

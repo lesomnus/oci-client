@@ -9,14 +9,7 @@ const enabled = T.env.Hosted
 const credential = T.env.HubCredential
 
 const encode = (s: string) => new TextEncoder().encode(s)
-
-async function sha256(bytes: Uint8Array<ArrayBuffer>): Promise<Digest> {
-	const v = await crypto.subtle.digest('SHA-256', bytes)
-	const encoded = Array.from(new Uint8Array(v))
-		.map(b => b.toString(16).padStart(2, '0'))
-		.join('')
-	return new Digest('sha256', encoded)
-}
+const sha256 = (bytes: Uint8Array<ArrayBuffer>) => Digest.of(bytes)
 
 describe.skipIf(!enabled)('hosted registries', () => {
 	// Images that are not ours, read without a credential.

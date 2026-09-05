@@ -47,6 +47,21 @@ console.log(index?.manifests[0].platform?.os)
 // "linux"
 ```
 
+### Push a Blob
+A blob is identified by the digest of what it holds, which `Digest.of` computes.
+```ts
+import { ClientV2, Digest } from '@lesomnus/oci-client'
+
+const client = new ClientV2('localhost:5000')
+const repo = client.repo('my/app')
+
+const data = new TextEncoder().encode('...')
+await repo.blobs.upload(await Digest.of(data), data).unwrap()
+```
+Note that it is computed by the Web Crypto API, which a browser serves only in
+a secure context. Use `blobs.startUpload` with a hasher of your own for the data
+that is too large to be held at once.
+
 ### Authenticate
 A credential is used to obtain a token from the authentication service the
 registry points to, or to answer a `Basic` challenge directly.

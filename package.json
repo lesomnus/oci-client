@@ -24,7 +24,11 @@
 		"url": "https://github.com/lesomnus/oci-client/issues"
 	},
 	"homepage": "https://github.com/lesomnus/oci-client#readme",
+	"engines": {
+		"node": ">=22"
+	},
 	"type": "module",
+	"sideEffects": false,
 	"main": "./dist/main.cjs",
 	"module": "./dist/main.js",
 	"exports": {

@@ -118,3 +118,32 @@ describe('Digest', () => {
 		})
 	})
 })
+
+describe('Digest.of', () => {
+	const encode = (v: string) => new TextEncoder().encode(v)
+
+	it('digests what the empty descriptor holds', async () => {
+		// The spec states the digest of `{}`, so it is a vector to check against.
+		const v = await Digest.of(encode('{}'))
+		expect(v.toString()).to.eq('sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a')
+	})
+	it('digests an empty input', async () => {
+		const v = await Digest.of(new Uint8Array(0))
+		expect(v.toString()).to.eq('sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
+	})
+	it('digests with sha512', async () => {
+		const v = await Digest.of(encode('abc'), 'sha512')
+		expect(v.algorithm.toString()).to.eq('sha512')
+		expect(v.encoded).to.eq(
+			'ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f',
+		)
+	})
+	it('digests a `Blob`', async () => {
+		const v = await Digest.of(new Blob(['{}']))
+		expect(v.toString()).to.eq('sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a')
+	})
+	it('makes a digest that parses back', async () => {
+		const v = await Digest.of(encode('round trip'))
+		expect(Digest.parse(v.toString()).toString()).to.eq(v.toString())
+	})
+})
