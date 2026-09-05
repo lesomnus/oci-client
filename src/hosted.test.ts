@@ -1,4 +1,4 @@
-import { Chunk, ClientV2, Digest, ResError } from '~/index'
+import { Chunk, ClientV2, Digest, ext, ResError } from '~/index'
 import { vnd } from '~/media-types'
 import T from '~/testutils'
 
@@ -26,6 +26,11 @@ describe.skipIf(!enabled)('hosted registries', () => {
 	])('$domain', ({ domain, name, reference }) => {
 		const repo = new ClientV2(domain).repo(name)
 
+		test('tells what it can be asked for', async () => {
+			const v = await new ClientV2(domain).detect().unwrap()
+			expect(v.features).to.have.property('search')
+			expect(v.extensions).to.be.instanceOf(Array)
+		})
 		test('lists the tags', async () => {
 			const v = await repo.tags.list({ n: 3 }).unwrap()
 			expect(v.name).to.eq(name)
@@ -68,6 +73,27 @@ describe.skipIf(!enabled)('hosted registries', () => {
 		})
 	})
 
+	describe('the search of Docker Hub', () => {
+		const client = ClientV2.with(ext.search.V1).make('index.docker.io')
+
+		test('is the dialect that is detected', async () => {
+			const v = await new ClientV2('index.docker.io').detect().unwrap()
+			expect(v.features.search).to.eq('v1')
+			expect(ext.search.of(v.features.search)).to.eq(ext.search.V1)
+		})
+		test('finds the repositories', async () => {
+			const v = await client.search('nginx', { n: 3 }).unwrap()
+
+			expect(v.total).to.be.greaterThan(0)
+			expect(v.repositories).to.have.lengthOf(3)
+			expect(v.repositories.map(r => r.name)).to.contain('nginx')
+
+			const [official] = v.repositories.filter(r => r.name === 'nginx')
+			expect(official.official).to.be.true
+			expect(official.downloads).to.be.greaterThan(0)
+		})
+	})
+
 	describe.skipIf(credential === undefined)('a repository that is not public', () => {
 		const Repo = T.env.HubRepo
 		const authorized = new ClientV2('index.docker.io', { credential }).repo(Repo)
@@ -106,6 +132,21 @@ describe.skipIf(!enabled)('hosted registries', () => {
 			// It cannot say whether it is there, which is not the same as
 			// saying that it is not.
 			await expect(anonymous.manifests.exists('v1')).rejects.toThrowError(ResError)
+		})
+		test('paginates the tags', async () => {
+			const v = await authorized.tags.list({ n: 1 }).unwrap()
+			expect(v.tags).to.have.lengthOf.at.most(1)
+		})
+		test('accepts a blob uploaded in chunks', async () => {
+			const data = encode(`chunked ${Date.now()}\n`)
+			const digest = await sha256(data)
+
+			const { location } = await authorized.blobs.initUpload().unwrap()
+			const { location: next } = await authorized.blobs.uploadChunk(location, new Chunk(data)).unwrap()
+
+			const res = await authorized.blobs.closeUpload(next, digest)
+			expect(res.raw.status).to.eq(201)
+			expect((await authorized.blobs.exists(digest)).ok).to.be.true
 		})
 		test('accepts a blob uploaded in a single request', async () => {
 			const data = encode(`single ${Date.now()}\n`)
