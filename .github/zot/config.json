@@ -1,0 +1,42 @@
+{
+	"distSpecVersion": "1.1.1",
+	"storage": {
+		"rootDirectory": "/var/lib/registry"
+	},
+	"http": {
+		"address": "0.0.0.0",
+		"port": "5000",
+		"realm": "zot",
+		"auth": {
+			"htpasswd": {
+				"path": "/etc/zot/htpasswd"
+			}
+		},
+		"accessControl": {
+			"repositories": {
+				"**": {
+					"anonymousPolicy": ["read", "create", "update", "delete"],
+					"defaultPolicy": ["read", "create", "update", "delete"]
+				},
+				"private/**": {
+					"policies": [
+						{
+							"users": ["tester"],
+							"actions": ["read", "create", "update", "delete"]
+						}
+					],
+					"anonymousPolicy": [],
+					"defaultPolicy": []
+				}
+			}
+		}
+	},
+	"log": {
+		"level": "warn"
+	},
+	"extensions": {
+		"search": {
+			"enable": true
+		}
+	}
+}

@@ -18,6 +18,21 @@ export const HubCredential =
 		? { username: import.meta.env.REGISTRY_HUB_USERNAME, password: import.meta.env.REGISTRY_HUB_TOKEN }
 		: undefined
 
+/**
+ * Credential that the local registry is configured to accept, which is a
+ * fixture rather than a secret; see `.github/zot`.
+ */
+export const Credential = {
+	username: import.meta.env.REGISTRY_USERNAME ?? 'tester',
+	password: import.meta.env.REGISTRY_PASSWORD ?? 'tester-secret',
+}
+
+/**
+ * Repository that the local registry serves only to {@link Credential}.
+ * The tests that use it are skipped where the registry does not protect it.
+ */
+export const PrivateRepo = import.meta.env.REGISTRY_PRIVATE_REPO ?? 'private/thing'
+
 /** Private repository on Docker Hub that the tests push to and read back. */
 export const HubRepo = import.meta.env.REGISTRY_HUB_REPO ?? 'lesomnus/oci-client-test'
 

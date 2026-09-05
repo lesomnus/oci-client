@@ -24,17 +24,21 @@ const enabled = await (async () => {
 	}
 })()
 
-describe.skipIf(!enabled)('ext search zot', async () => {
+describe.skipIf(!enabled)('ext search zot', () => {
 	const Prefix = 'search-zot'
 	const Repos = [`${Prefix}/a`, `${Prefix}/b`, `${Prefix}/c`]
 
-	for (const name of Repos) {
-		const image = T.asset.Images['v0.1.0']
-		const repo = client.repo(name)
-		await repo.blobs.upload(vnd.oci.empty.digest, T.asset.EmptyObjectData).unwrap()
-		await repo.blobs.upload(image.digest, image.chunk).unwrap()
-		await repo.manifests.put(image.ref, vnd.oci.image.manifestV1, image.manifestBytes).unwrap()
-	}
+	// The body of a suite is collected even where the suite is skipped, so
+	// pushing here keeps it off the registries the suite is skipped for.
+	beforeAll(async () => {
+		for (const name of Repos) {
+			const image = T.asset.Images['v0.1.0']
+			const repo = client.repo(name)
+			await repo.blobs.upload(vnd.oci.empty.digest, T.asset.EmptyObjectData).unwrap()
+			await repo.blobs.upload(image.digest, image.chunk).unwrap()
+			await repo.manifests.put(image.ref, vnd.oci.image.manifestV1, image.manifestBytes).unwrap()
+		}
+	})
 
 	// The registry indexes what was pushed on its own schedule.
 	const found = async (query: string) => {

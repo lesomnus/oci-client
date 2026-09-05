@@ -64,7 +64,7 @@ jobs:
           docker run --detach --name registry \
             --publish 5000:5000 \
             --env REGISTRY_STORAGE_DELETE_ENABLED=true \
-            --volume "${{ github.workspace }}/.github/zot.json:/etc/zot/config.json:ro" \
+            --volume "${{ github.workspace }}/.github/zot:/etc/zot:ro" \
             "${{ matrix.registry.image }}"
 
       - name: Wait registry
