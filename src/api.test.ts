@@ -39,8 +39,8 @@ describe.concurrent('api v2', async () => {
 	// the registry actually does.
 	let supportsReferrers = false
 	for (const artifact of Object.values(T.asset.Artifacts)) {
-		const res = await repo.manifests.put(artifact.digest, vnd.oci.image.manifestV1, artifact.bytes)
-		await res.unwrap()
+		const res = await repo.manifests.put(artifact.digest, vnd.oci.image.manifestV1, artifact.bytes).result()
+		res.unwrap()
 		supportsReferrers ||= res.raw.headers.get('OCI-Subject') !== null
 	}
 
@@ -48,28 +48,19 @@ describe.concurrent('api v2', async () => {
 		client.repo(`test-${ctx.task.file.projectName}/${name ?? ctx.task.suite?.name.slice(0, 7).trim()}`)
 
 	test(title('end-1', 'GET', '/'), async () => {
-		const req = client.ping()
-		await expect(req).resolves.toBeTruthy()
-
-		const res = await req
+		const res = await client.ping().result()
 		expect(res.raw.status).to.eq(200)
 	})
 	describe.concurrent(title('end-2', 'HEAD', 'blobs/<digest>'), () => {
 		test('200', async () => {
 			const { digest } = T.asset.Images['v0.1.0']
 
-			const req = repo.blobs.exists(digest)
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.blobs.exists(digest)
 			expect(res.raw.status).to.eq(200)
 			expect(res.ok).to.be.true
 		})
 		test('404', async () => {
-			const req = repo.blobs.exists(T.asset.HashOfNotExists)
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.blobs.exists(T.asset.HashOfNotExists)
 			expect(res.raw.status).to.eq(404)
 			expect(res.ok).to.be.false
 		})
@@ -78,23 +69,17 @@ describe.concurrent('api v2', async () => {
 		test('200', async () => {
 			const { data, digest } = T.asset.Images['v0.1.0']
 
-			const req = repo.blobs.get(digest)
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.blobs.get(digest).result()
 			expect(res.raw.status).to.eq(200)
 
 			const v = await res.raw.text()
 			expect(v).to.eq(data)
 		})
 		test('404', async () => {
-			const req = repo.blobs.get(T.asset.HashOfNotExists)
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.blobs.get(T.asset.HashOfNotExists).result()
 			expect(res.raw.status).to.eq(404)
 
-			const errors = await res.unwrapOr((_, errors) => errors)
+			const errors = res.unwrapOr((_, errors) => errors)
 			if (!Array.isArray(errors)) expect.unreachable()
 			expect(errors.some(err => err.code === Codes.BlobUnknown)).to.be.true
 		})
@@ -103,18 +88,12 @@ describe.concurrent('api v2', async () => {
 		test('200', async () => {
 			const { ref } = T.asset.Images['v0.1.0']
 
-			const req = repo.manifests.exists(ref)
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.manifests.exists(ref)
 			expect(res.raw.status).to.eq(200)
 			expect(res.ok).to.be.true
 		})
 		test('404', async () => {
-			const req = repo.manifests.exists('not-exists')
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.manifests.exists('not-exists')
 			expect(res.raw.status).to.eq(404)
 			expect(res.ok).to.be.false
 		})
@@ -123,28 +102,19 @@ describe.concurrent('api v2', async () => {
 		test('200', async () => {
 			const { ref, manifest } = T.asset.Images['v0.1.0']
 
-			const req = repo.manifests.get(ref)
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.manifests.get(ref).result()
 			expect(res.raw.status).to.eq(200)
 
-			const result = res.unwrap()
-			await expect(result).resolves.toBeTruthy()
-
-			const opaque = await result
+			const opaque = res.unwrap()
 			const v = opaque.as(vnd.oci.image.manifestV1)
 			expect(v).not.to.be.undefined
 			expect(v).containSubset(manifest)
 		})
 		test('404', async () => {
-			const req = repo.manifests.get('not-exists')
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.manifests.get('not-exists').result()
 			expect(res.raw.status).to.eq(404)
 
-			const errors = await res.unwrapOr((_, errors) => errors)
+			const errors = res.unwrapOr((_, errors) => errors)
 			if (!Array.isArray(errors)) expect.unreachable()
 			expect(errors.some(err => err.code === Codes.ManifestUnknown)).to.be.true
 		})
@@ -152,14 +122,9 @@ describe.concurrent('api v2', async () => {
 	describe.concurrent(title('end-4a', 'POST', 'blobs/uploads'), () => {
 		test('202', async ctx => {
 			const repo = getRepo(ctx)
-			const req = repo.blobs.initUpload()
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.blobs.initUpload().result()
 			expect(res.raw.status).to.eq(202)
-			await expect(res.unwrap()).resolves.toBeTruthy()
-
-			const v = await res.unwrap()
+			const v = res.unwrap()
 			expect(v.location).to.be.exist
 		})
 	})
@@ -168,14 +133,9 @@ describe.concurrent('api v2', async () => {
 			const { chunk, digest } = T.asset.Images['v0.1.0']
 
 			const repo = getRepo(ctx)
-			const req = repo.blobs.upload(digest, chunk)
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.blobs.upload(digest, chunk).result()
 			expect(res.raw.status).to.eq(201)
-			await expect(res.unwrap()).resolves.toBeTruthy()
-
-			const v = await res.unwrap()
+			const v = res.unwrap()
 			expect(v.location).to.be.exist
 		})
 	})
@@ -186,14 +146,9 @@ describe.concurrent('api v2', async () => {
 			const repo = getRepo(ctx)
 			const { location } = await repo.blobs.initUpload().unwrap()
 
-			const req = repo.blobs.uploadChunk(location, chunk)
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.blobs.uploadChunk(location, chunk).result()
 			expect(res.raw.status).to.eq(202)
-			await expect(res.unwrap()).resolves.toBeTruthy()
-
-			const v = await res.unwrap()
+			const v = res.unwrap()
 			expect(v.location).to.be.exist
 		})
 		test.runIf(T.env.Supports.outOfOrderChunk)('416', async ctx => {
@@ -202,15 +157,12 @@ describe.concurrent('api v2', async () => {
 			const repo = getRepo(ctx)
 			const { location } = await repo.blobs.initUpload().unwrap()
 
-			const req = repo.blobs.uploadChunk(location, chunk.withPos(1))
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.blobs.uploadChunk(location, chunk.withPos(1)).result()
 			expect(res.raw.status).to.eq(416)
 
 			// The spec does not define which code is reported for it; zot says
 			// `BLOB_UPLOAD_INVALID` while distribution says `RANGE_INVALID`.
-			const errors = await res.unwrapOr((_, errors) => errors)
+			const errors = res.unwrapOr((_, errors) => errors)
 			if (!Array.isArray(errors)) expect.unreachable()
 			expect(errors).not.to.be.empty
 		})
@@ -222,14 +174,9 @@ describe.concurrent('api v2', async () => {
 			const repo = getRepo(ctx)
 			const { location } = await repo.blobs.initUpload().unwrap()
 
-			const req = repo.blobs.closeUpload(location, digest, chunk)
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.blobs.closeUpload(location, digest, chunk).result()
 			expect(res.raw.status).to.eq(201)
-			await expect(res.unwrap()).resolves.toBeTruthy()
-
-			const v = await res.unwrap()
+			const v = res.unwrap()
 			expect(v.location).to.be.exist
 		})
 	})
@@ -238,29 +185,21 @@ describe.concurrent('api v2', async () => {
 			const { ref, digest, chunk, manifest } = T.asset.Images['v0.1.0']
 
 			const repo = getRepo(ctx)
-			await repo.blobs.upload(digest, chunk)
-			await repo.blobs.upload(vnd.oci.empty.digest, T.asset.EmptyObjectData)
+			await repo.blobs.upload(digest, chunk).unwrap()
+			await repo.blobs.upload(vnd.oci.empty.digest, T.asset.EmptyObjectData).unwrap()
 
-			const res = await repo.manifests.put(ref, manifest.mediaType, JSON.stringify(manifest))
+			const res = await repo.manifests.put(ref, manifest.mediaType, JSON.stringify(manifest)).result()
 			expect(res.raw.status).to.eq(201)
-			await expect(res.unwrap()).resolves.toBeTruthy()
-
-			const v = await res.unwrap()
+			const v = res.unwrap()
 			expect(v.location).to.be.instanceOf(URL)
 		})
 	})
 	describe.concurrent(title('end-8a', 'GET', 'tags/list'), () => {
 		test('200', async () => {
-			const req = repo.tags.list()
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.tags.list().result()
 			expect(res.raw.status).to.eq(200)
 
-			const result = res.unwrap()
-			await expect(result).resolves.toBeTruthy()
-
-			const v = await result
+			const v = res.unwrap()
 			expect(v.name).to.eq(Repo)
 			expect(v.tags.slice().sort()).to.eql(['v0.1.0', 'v0.2.0', 'v0.3.0'])
 			if (T.env.Supports.sortedTags) {
@@ -268,42 +207,30 @@ describe.concurrent('api v2', async () => {
 			}
 		})
 		test('404', async () => {
-			const req = client.repo('test/end-8a-not-exists').tags.list()
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await client.repo('test/end-8a-not-exists').tags.list().result()
 			expect(res.raw.status).to.eq(404)
 
-			const errors = await res.unwrapOr((_, errors) => errors)
+			const errors = res.unwrapOr((_, errors) => errors)
 			if (!Array.isArray(errors)) expect.unreachable()
 			expect(errors.some(err => err.code === Codes.NameUnknown)).to.be.true
 		})
 	})
 	describe.concurrent(title('end-8b', 'GET', 'tags/list?n=_&last=_'), () => {
 		test.runIf(T.env.Supports.tagPagination)('200', async () => {
-			const req = repo.tags.list({ n: 2, last: 'v0.2.0' })
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.tags.list({ n: 2, last: 'v0.2.0' }).result()
 			expect(res.raw.status).to.eq(200)
 
-			const result = res.unwrap()
-			await expect(result).resolves.toBeTruthy()
-
-			const v = await result
+			const v = res.unwrap()
 			expect(v.name).to.eq(Repo)
 			expect(v.tags).to.be.instanceOf(Array)
 			expect(v.tags).to.eql(['v0.3.0'])
 		})
 		test.runIf(T.env.Supports.unknownRepository)('404', async ctx => {
 			const repo = getRepo(ctx, 'end-8b-not-exists')
-			const req = repo.tags.list({ n: 2, last: 'v0.2.0' })
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.tags.list({ n: 2, last: 'v0.2.0' }).result()
 			expect(res.raw.status).to.eq(404)
 
-			const errors = await res.unwrapOr((_, errors) => errors)
+			const errors = res.unwrapOr((_, errors) => errors)
 			if (!Array.isArray(errors)) expect.unreachable()
 			expect(errors.some(err => err.code === Codes.NameUnknown)).to.be.true
 		})
@@ -321,20 +248,13 @@ describe.concurrent('api v2', async () => {
 			const digest = await T.hash(bytes)
 			await repo.manifests.put(digest, vnd.oci.image.manifestV1, JSON.stringify(image.manifest)).unwrap()
 
-			const req = repo.manifests.delete(digest)
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.manifests.delete(digest).result()
 			expect(res.raw.status).to.eq(202)
 
-			const result = res.unwrap()
-			await expect(result).resolves.toBeTruthy()
+			res.unwrap()
 		})
 		test('404', async () => {
-			const req = repo.manifests.delete(T.asset.HashOfNotExists)
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.manifests.delete(T.asset.HashOfNotExists).result()
 			expect(res.raw.status).to.eq(404)
 		})
 	})
@@ -345,20 +265,13 @@ describe.concurrent('api v2', async () => {
 			const repo = getRepo(ctx)
 			await repo.blobs.upload(digest, chunk).unwrap()
 
-			const req = repo.blobs.delete(digest)
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.blobs.delete(digest).result()
 			expect(res.raw.status).to.eq(202)
 
-			const result = res.unwrap()
-			await expect(result).resolves.toBeTruthy()
+			res.unwrap()
 		})
 		test('404', async () => {
-			const req = repo.blobs.delete(T.asset.HashOfNotExists)
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.blobs.delete(T.asset.HashOfNotExists).result()
 			expect(res.raw.status).to.eq(404)
 		})
 	})
@@ -368,30 +281,20 @@ describe.concurrent('api v2', async () => {
 
 			const repo = getRepo(ctx)
 			// `from` is the repository that holds the blob, not a reference of it.
-			const req = repo.blobs.mount(digest, Repo)
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.blobs.mount(digest, Repo).result()
 			expect(res.raw.status).to.eq(201)
 
-			const result = res.unwrap()
-			await expect(result).resolves.toBeTruthy()
+			res.unwrap()
 		})
 	})
 	describe.concurrent(title('end-12a', 'GET', 'referrers/<digest>'), () => {
 		test('200', async () => {
 			const { manifestDigest } = T.asset.Images['v0.1.0']
 
-			const req = repo.referrers.get(manifestDigest)
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.referrers.get(manifestDigest).result()
 			expect(res.raw.status).to.eq(200)
 
-			const result = res.unwrap()
-			await expect(result).resolves.toBeTruthy()
-
-			const v = await result
+			const v = res.unwrap()
 			if (!supportsReferrers) {
 				// The referrers are listed by the tag schema, which nothing
 				// maintains here, so there is none to be found.
@@ -413,10 +316,7 @@ describe.concurrent('api v2', async () => {
 		})
 		test.runIf(supportsReferrers)('400', async () => {
 			// It is a well-formed digest but the registry does not know the algorithm.
-			const req = repo.referrers.get('foo:bar')
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.referrers.get('foo:bar').result()
 			expect(res.raw.status).to.eq(400)
 		})
 	})
@@ -425,16 +325,10 @@ describe.concurrent('api v2', async () => {
 			const { manifestDigest } = T.asset.Images['v0.1.0']
 			const artifact = T.asset.Artifacts['application/foo']
 
-			const req = repo.referrers.get(manifestDigest, { artifactType: artifact.manifest.artifactType })
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.referrers.get(manifestDigest, { artifactType: artifact.manifest.artifactType }).result()
 			expect(res.raw.status).to.eq(200)
 
-			const result = res.unwrap()
-			await expect(result).resolves.toBeTruthy()
-
-			const v = await result
+			const v = res.unwrap()
 			if (!supportsReferrers) {
 				expect(v.manifests).to.be.empty
 				return
@@ -455,14 +349,9 @@ describe.concurrent('api v2', async () => {
 			let { location } = await repo.blobs.initUpload().unwrap()
 			;({ location } = await repo.blobs.uploadChunk(location, new Chunk(Uint8Array.from([1, 2, 3]))).unwrap())
 
-			const req = repo.blobs.getUploadStatus(location)
-			await expect(req).resolves.toBeTruthy()
-
-			const res = await req
+			const res = await repo.blobs.getUploadStatus(location).result()
 			expect(res.raw.status).to.eq(204)
-			await expect(res.unwrap()).resolves.toBeTruthy()
-
-			const v = await res.unwrap()
+			const v = res.unwrap()
 			expect(v.location).to.be.exist
 			expect(v.range.pos).to.eq(0)
 			expect(v.range.length).to.eq(3)

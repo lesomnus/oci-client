@@ -21,7 +21,7 @@ npm i @lesomnus/oci-client
 import { ClientV2 } from '@lesomnus/oci-client'
 
 const client = new ClientV2('index.docker.io')
-await client.ping()
+await client.ping().unwrap()
 
 const v = await client.repo('library/node').tags.list().unwrap()
 console.log(v)
@@ -39,7 +39,7 @@ import { ClientV2 } from '@lesomnus/oci-client'
 import { vnd } from '@lesomnus/oci-client/media-types'
 
 const client = new ClientV2('index.docker.io')
-await client.ping()
+await client.ping().unwrap()
 
 const opaque = await client.repo('library/node').manifests.get('latest').unwrap()
 const index = opaque.as(vnd.oci.image.indexV1)
