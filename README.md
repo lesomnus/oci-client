@@ -47,6 +47,31 @@ console.log(index?.manifests[0].platform?.os)
 // "linux"
 ```
 
+### Read a Response
+Awaiting a request answers the response along with what it says; `unwrap` skips
+to the value and throws where the registry answered with an error.
+```ts
+import { ClientV2, Codes } from '@lesomnus/oci-client'
+import { vnd } from '@lesomnus/oci-client/media-types'
+
+const repo = new ClientV2('index.docker.io').repo('library/node')
+
+// The value, or `ResError`.
+const tags = await repo.tags.list().unwrap()
+
+// The response, to read before deciding what an error means.
+const res = await repo.manifests.get('does-not-exist')
+if (res.ok) {
+	res.value.as(vnd.oci.image.manifestV1)
+} else {
+	res.raw.status // 404
+	res.errors.some(e => e.code === Codes.ManifestUnknown)
+}
+
+// Or answer an error with a value of your own.
+const codes = await repo.manifests.get('does-not-exist').unwrapOr((_, errors) => errors.map(e => e.code))
+```
+
 ### Push a Blob
 A blob is identified by the digest of what it holds, which `Digest.of` computes.
 ```ts
@@ -139,40 +164,61 @@ console.log(v.repositories)
 
 ## Tested Registries
 
-Every change is tested against the registries below on the two most recent LTS
+| Registry                                                     | Version   | Run              | Covered                                    |
+| ------------------------------------------------------------ | --------- | ---------------- | ------------------------------------------ |
+| [zot](https://zotregistry.dev/)                              | `v2.1.20` | every change     | all of it, a protected repository included |
+| [distribution](https://distribution.github.io/distribution/) | `v3.1.1`  | every change     | all of it                                  |
+| [distribution](https://distribution.github.io/distribution/) | `v2.8.3`  | every change     | all of it                                  |
+| [Docker Hub](https://hub.docker.com/)                        | hosted    | daily            | reading a public image, and writing to, deleting from and reading a private repository |
+| [ghcr.io](https://ghcr.io/)                                  | hosted    | daily            | reading a public image, and writing        |
+
+The two on a schedule are outside this repository and are rate limited, so they
+are not reached on every change. Everything runs on the two most recent LTS
 versions of *Node.js*, in *Node.js* and in the browser.
 
-| Registry                                                     | Version   |
-| ------------------------------------------------------------ | --------- |
-| [zot](https://zotregistry.dev/)                              | `v2.1.20` |
-| [distribution](https://distribution.github.io/distribution/) | `v3.1.1`  |
-| [distribution](https://distribution.github.io/distribution/) | `v2.8.3`  |
+### What the registries do differently
 
-*Docker Hub* and *ghcr.io* are tested on a schedule rather than on every change
-since they are outside this repository and are rate limited. Reading a public
-image is covered on both, and writing to, deleting from and reading a private
-repository is covered on *Docker Hub*.
+The spec leaves some of it to the registry, and not every registry complies with
+all of it. A dash is a behavior that is not covered against that registry.
 
-The spec leaves some of the behaviors to the registry and not every registry
-complies with all of it. This client smooths over what it can:
-
-| Behavior                                                | *zot* | *distribution v3* | *distribution v2* |
-| -------------------------------------------------------- | ----- | ----------------- | ----------------- |
-| `end-4b` stores the blob in a single request            | ✅    | ❌ answers `202`  | ❌ answers `202`  |
-| `end-5`  `416` for a chunk uploaded out of order        | ✅    | ✅                | ❌ answers `202`  |
-| `end-8a` lists the tags in lexical order                | ✅    | ✅                | ❌                |
-| `end-8b` paginates the tags by `n` and `last`           | ✅    | ✅                | ❌ lists them all |
-| `end-8b` `404` for a repository that does not exist     | ✅    | ❌ answers `200`  | ✅                |
-| `end-12` Referrers API                                  | ✅    | ❌                | ❌                |
-
-*Docker Hub* serves all of it but `end-10`, which answers `405 Method Not
-Allowed`: a manifest can be deleted while the blob it pointed at stays.
-`ghcr.io` answers `404 Not Found` for a manifest request that does not say what
-it accepts, so the client always states it.
+| Behavior                                            | *zot* | *distribution v3* | *distribution v2* | *Docker Hub*  | *ghcr.io* |
+| ----------------------------------------------------- | ----- | ----------------- | ----------------- | ------------- | --------- |
+| `end-4b` stores the blob in a single request        | ✅    | ❌ answers `202`  | ❌ answers `202`  | ✅            | —         |
+| `end-5`  `416` for a chunk uploaded out of order    | ✅    | ✅                | ❌ answers `202`  | —             | —         |
+| `end-8a` lists the tags in lexical order            | ✅    | ✅                | ❌                | —             | —         |
+| `end-8b` paginates the tags by `n` and `last`       | ✅    | ✅                | ❌ lists them all | —             | —         |
+| `end-8b` `404` for a repository that does not exist | ✅    | ❌ answers `200`  | ✅                | —             | —         |
+| `end-10` deletes a blob                             | ✅    | ✅                | ✅                | ❌ `405`      | —         |
+| `end-12` Referrers API                              | ✅    | ❌                | ❌                | ✅            | ✅        |
+| `/v2/_catalog`                                      | ✅    | ✅                | ✅                | needs an authorization | needs an authorization |
 
 `end-4b` and `end-12` are handled by the client, so a blob is uploaded and the
-referrers are listed whichever registry is on the other end. The rest is the
-registry answering differently for the same request.
+referrers are listed whichever registry is on the other end. `ghcr.io` answers
+`404 Not Found` for a manifest request that does not say what it accepts, so the
+client always states it. The rest is the registry answering differently for the
+same request.
+
+### Which extension a registry answers
+
+Searching is not a part of the spec, so it depends on the registry. This is what
+each answered when it was tried:
+
+| Registry                       | Search                                  |
+| -------------------------------- | ----------------------------------------- |
+| *zot*, with the extension enabled | `ext.search.Zot`                        |
+| *Docker Hub*                    | `ext.search.V1`                           |
+| *quay.io*                       | `ext.search.V1`                           |
+| *distribution*, *ghcr.io*, *registry.k8s.io* | serves none                  |
+
+It is what was seen at the time of writing rather than something to rely on: a
+*zot* built without its extensions serves no search although it is still *zot*,
+and `/v1/search` is served by registries that say nothing about what they are.
+Ask the registry instead, which is what `detect` is for:
+
+```ts
+const { features } = await new ClientV2(domain).detect().unwrap()
+const Search = ext.search.of(features.search)
+```
 
 ## Implemented APIs
 
