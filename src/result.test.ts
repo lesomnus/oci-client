@@ -49,7 +49,11 @@ describe('result', () => {
 			let seen: unknown
 			const req = result(jsonError([{ code: '42', message: 'nope', detail: '' }]), empty)
 
-			await expect(req.unwrap((_, errors) => void (seen = errors))).rejects.toThrowError(ResError)
+			await expect(
+				req.unwrap((_, errors) => {
+					seen = errors
+				}),
+			).rejects.toThrowError(ResError)
 			expect(seen).to.have.lengthOf(1)
 		})
 		it('rejects the error raised while resolving a result', async () => {
