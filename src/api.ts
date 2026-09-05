@@ -527,6 +527,21 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 	}
 }
 
+/**
+ * Media types of a manifest that this client can read.
+ *
+ * A registry may answer `404 Not Found` for a manifest it cannot represent as
+ * one of the accepted media types, so what can be read is always stated;
+ * `ghcr.io` does exactly that where nothing is accepted. The {@link Accept}
+ * middleware overrides it where the caller wants something narrower.
+ */
+const Accepts = [
+	vnd.oci.image.indexV1, //
+	vnd.oci.image.manifestV1,
+	vnd.docker.distribution.manifestListV2,
+	vnd.docker.distribution.manifestV2,
+].join(', ')
+
 export class ManifestsApiV2 extends ApiBase<'manifests'> {
 	constructor(
 		readonly transport: Transport,
@@ -551,7 +566,7 @@ export class ManifestsApiV2 extends ApiBase<'manifests'> {
 	exists(reference?: Reference) {
 		reference = this.#fallbackReference(reference)
 		const u = this.#u(reference)
-		return this._head(u, { reference })
+		return this._head(u, { reference }, { headers: { Accept: Accepts } })
 	}
 
 	/**
@@ -578,7 +593,7 @@ export class ManifestsApiV2 extends ApiBase<'manifests'> {
 	}> {
 		reference = this.#fallbackReference(reference)
 		const u = this.#u(reference)
-		const req = this.exec(u, { reference }, { method: 'GET' })
+		const req = this.exec(u, { reference }, { method: 'GET', headers: { Accept: Accepts } })
 		return result(req, res =>
 			res.json().then(v => ({
 				...v,
@@ -705,7 +720,8 @@ export class ReferrersApiV2 extends ApiBase<'referrers'> {
 		const d = typeof digest === 'string' ? Digest.parse(digest) : digest
 
 		const u = `${this.#u(d)}${makeParams(opts)}`
-		const req = this.exec<'GET'>(u, { ...opts }, { method: 'GET' }).then(res => (res.status === 404 ? this.#byTag(d, opts) : res))
+		const req = this.exec<'GET'>(u, { ...opts }, { method: 'GET', headers: { Accept: vnd.oci.image.indexV1 } }) //
+			.then(res => (res.status === 404 ? this.#byTag(d, opts) : res))
 		return result<ReferrersApiV2GetRes>(req, res => res.json())
 	}
 }

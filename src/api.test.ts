@@ -483,6 +483,53 @@ describe.concurrent('api v2', async () => {
 	})
 })
 
+describe('ManifestsApiV2 accepts', () => {
+	// `ghcr.io` answers `404 Not Found` for a manifest it cannot represent as
+	// one of the accepted media types, so what can be read is always stated.
+	const record = () => {
+		const seen: (null | string)[] = []
+		const transport: Transport = {
+			fetch(resource, init) {
+				seen.push(new Request(resource instanceof URL ? resource.toString() : resource, init).headers.get('Accept'))
+				return Promise.resolve(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }))
+			},
+		}
+		return [new ClientV2('x.com', { transport }).repo('foo/bar'), seen] as const
+	}
+
+	it('states the manifest media types it can read', async () => {
+		const [repo, seen] = record()
+		await repo.manifests.get('latest').unwrap()
+
+		const [accept] = seen
+		expect(accept).to.contain(vnd.oci.image.manifestV1)
+		expect(accept).to.contain(vnd.oci.image.indexV1)
+		// A registry serving what Docker pushed answers with these.
+		expect(accept).to.contain(vnd.docker.distribution.manifestV2)
+		expect(accept).to.contain(vnd.docker.distribution.manifestListV2)
+	})
+	it('states them on a "HEAD" as well', async () => {
+		const [repo, seen] = record()
+		await repo.manifests.exists('latest')
+		expect(seen[0]).to.contain(vnd.oci.image.manifestV1)
+	})
+	it('is overridden by the `Accept` middleware', async () => {
+		const seen: (null | string)[] = []
+		const transport: Transport = {
+			fetch(resource, init) {
+				seen.push(new Request(resource instanceof URL ? resource.toString() : resource, init).headers.get('Accept'))
+				return Promise.resolve(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }))
+			},
+		}
+		const client = new ClientV2('x.com', {
+			transport: [new Accept({ manifests: [vnd.oci.image.manifestV1] }), transport],
+		})
+
+		await client.repo('foo/bar').manifests.get('latest').unwrap()
+		expect(seen[0]).to.eq(vnd.oci.image.manifestV1)
+	})
+})
+
 describe('ReferrersApiV2 fallback', () => {
 	const Subject = `sha256:${'a'.repeat(64)}`
 	const Tag = `sha256-${'a'.repeat(64)}`
