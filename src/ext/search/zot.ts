@@ -69,8 +69,7 @@ async function dataOf<T>(res: Response): Promise<T> {
  *
  * @example
  * ```ts
- * const Client = ClientV2.with(ext.search.Zot)
- * const client = new Client('localhost:5000')
+ * const client = ClientV2.with(ext.search.Zot).make('localhost:5000')
  * const v = await client.search('alpine', { n: 10 }).unwrap()
  * ```
  */

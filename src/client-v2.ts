@@ -142,6 +142,27 @@ function evaluate(domain: string, init?: ClientInit): [string, Transport] {
 // biome-ignore lint/suspicious/noExplicitAny: it is required to distribute the union
 type UnionToIntersection<U> = (U extends any ? (v: U) => void : never) extends (v: infer I) => void ? I : never
 
+/** Client that has the features added by the given extensions. */
+type Composed<Ms extends ClientMixin[]> = ClientV2 & UnionToIntersection<InstanceType<ReturnType<Ms[number]>>>
+
+/**
+ * Class of a client, which can be constructed with `new` or with {@link make}.
+ */
+type ClientClass<T> = {
+	new (domain: string, init?: ClientInit): T
+
+	/**
+	 * Creates a client, which is `new` without the parentheses that a class
+	 * expression has to be wrapped in.
+	 *
+	 * @example
+	 * ```ts
+	 * const client = ClientV2.with(Catalog).make('index.docker.io')
+	 * ```
+	 */
+	make(domain: string, init?: ClientInit): T
+}
+
 export class ClientV2 extends clientV2(ClientBase) {
 	/**
 	 * Creates a client class of which instances have the features added by the
@@ -149,29 +170,37 @@ export class ClientV2 extends clientV2(ClientBase) {
 	 *
 	 * @example
 	 * ```ts
-	 * const Client = ClientV2.with(Catalog)
-	 * const client = new Client('index.docker.io')
+	 * const client = ClientV2.with(Catalog).make('index.docker.io')
 	 * const v = await client.catalog().unwrap()
 	 * ```
 	 */
-	static with<Ms extends ClientMixin[]>(...mixins: Ms) {
+	static with<Ms extends ClientMixin[]>(...mixins: Ms): ClientClass<Composed<Ms>> {
 		let Base: ClientExtension = ClientBase
 		for (const mixin of mixins) {
 			Base = mixin(Base)
 		}
 
 		const C = clientV2(Base)
+		// The mixins are composed at runtime so the type of the result has to
+		// be described rather than inferred.
 		return class V2 extends C {
+			static make(domain: string, init?: ClientInit) {
+				return new this(domain, init)
+			}
+
 			constructor(domain: string, init?: ClientInit) {
 				const [d, t] = evaluate(domain, init)
 				super(d, t)
 			}
-			// The mixins are composed at runtime so the type of the result has
-			// to be described here.
-		} as unknown as new (
-			domain: string,
-			init?: ClientInit,
-		) => ClientV2 & UnionToIntersection<InstanceType<ReturnType<Ms[number]>>>
+		} as unknown as ClientClass<Composed<Ms>>
+	}
+
+	/**
+	 * Creates a client.
+	 * It is `new ClientV2(...)`, for the code that reads better without it.
+	 */
+	static make(domain: string, init?: ClientInit): ClientV2 {
+		return new ClientV2(domain, init)
 	}
 
 	constructor(domain: string, init?: ClientInit) {

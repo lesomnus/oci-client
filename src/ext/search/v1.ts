@@ -24,8 +24,7 @@ type SearchV1Res = {
  *
  * @example
  * ```ts
- * const Client = ClientV2.with(ext.search.V1)
- * const client = new Client('index.docker.io')
+ * const client = ClientV2.with(ext.search.V1).make('index.docker.io')
  * const v = await client.search('nginx', { n: 10 }).unwrap()
  * ```
  */

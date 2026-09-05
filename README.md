@@ -83,7 +83,7 @@ console.log(v.features)
 // for whichever registry is on the other end.
 const Search = ext.search.of(v.features.search)
 if (Search !== undefined) {
-	const client = new (ClientV2.with(Search))(Domain)
+	const client = ClientV2.with(Search).make(Domain)
 	const found = await client.search('prometheus', { n: 10 }).unwrap()
 }
 ```
@@ -114,8 +114,7 @@ Extensions add APIs that are not a part of the distribution spec.
 ```ts
 import { ClientV2, ext } from '@lesomnus/oci-client'
 
-const Client = ClientV2.with(ext.Catalog)
-const client = new Client('localhost:5000')
+const client = ClientV2.with(ext.Catalog).make('localhost:5000')
 
 const v = await client.catalog({ n: 10 }).unwrap()
 console.log(v.repositories)
@@ -195,8 +194,7 @@ A field is left out where the registry does not report it.
 ```ts
 import { ClientV2, ext } from '@lesomnus/oci-client'
 
-const Client = ClientV2.with(ext.search.V1)
-const client = new Client('index.docker.io')
+const client = ClientV2.with(ext.search.V1).make('index.docker.io')
 
 const v = await client.search('nginx', { n: 3 }).unwrap()
 console.log(v.total, v.repositories[0])
@@ -215,8 +213,7 @@ Note that the search extension has to be enabled on *zot*;
 `/v2/_oci/ext/discover` tells whether it is.
 
 ```ts
-const Client = ClientV2.with(ext.search.Zot)
-const client = new Client('localhost:5000')
+const client = ClientV2.with(ext.search.Zot).make('localhost:5000')
 
 const v = await client
 	.graphql<{ ImageList: { Results: { Tag: string }[] } }>('query($repo: String!) { ImageList(repo: $repo) { Results { Tag } } }', {

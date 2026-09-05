@@ -21,8 +21,7 @@ export type CatalogRes = {
  *
  * @example
  * ```ts
- * const Client = ClientV2.with(Catalog)
- * const client = new Client('localhost:5000')
+ * const client = ClientV2.with(Catalog).make('localhost:5000')
  * const v = await client.catalog({ n: 10 }).unwrap()
  * ```
  */

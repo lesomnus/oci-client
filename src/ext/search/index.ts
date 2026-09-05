@@ -19,7 +19,7 @@ export * from './zot'
  * const { features } = await client.detect().unwrap()
  * const Search = ext.search.of(features.search)
  * if (Search !== undefined) {
- *   const searchable = new (ClientV2.with(Search))(domain)
+ *   const searchable = ClientV2.with(Search).make(domain)
  *   await searchable.search('nginx').unwrap()
  * }
  * ```
