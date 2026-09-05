@@ -39,7 +39,7 @@ describe.concurrent('api v2', async () => {
 	// the registry actually does.
 	let supportsReferrers = false
 	for (const artifact of Object.values(T.asset.Artifacts)) {
-		const res = await repo.manifests.put(artifact.digest, vnd.oci.image.manifestV1, artifact.bytes).result()
+		const res = await repo.manifests.put(artifact.digest, vnd.oci.image.manifestV1, artifact.bytes)
 		res.unwrap()
 		supportsReferrers ||= res.raw.headers.get('OCI-Subject') !== null
 	}
@@ -48,7 +48,7 @@ describe.concurrent('api v2', async () => {
 		client.repo(`test-${ctx.task.file.projectName}/${name ?? ctx.task.suite?.name.slice(0, 7).trim()}`)
 
 	test(title('end-1', 'GET', '/'), async () => {
-		const res = await client.ping().result()
+		const res = await client.ping()
 		expect(res.raw.status).to.eq(200)
 	})
 	describe.concurrent(title('end-2', 'HEAD', 'blobs/<digest>'), () => {
@@ -69,14 +69,14 @@ describe.concurrent('api v2', async () => {
 		test('200', async () => {
 			const { data, digest } = T.asset.Images['v0.1.0']
 
-			const res = await repo.blobs.get(digest).result()
+			const res = await repo.blobs.get(digest)
 			expect(res.raw.status).to.eq(200)
 
 			const v = await res.raw.text()
 			expect(v).to.eq(data)
 		})
 		test('404', async () => {
-			const res = await repo.blobs.get(T.asset.HashOfNotExists).result()
+			const res = await repo.blobs.get(T.asset.HashOfNotExists)
 			expect(res.raw.status).to.eq(404)
 
 			const errors = res.unwrapOr((_, errors) => errors)
@@ -102,7 +102,7 @@ describe.concurrent('api v2', async () => {
 		test('200', async () => {
 			const { ref, manifest } = T.asset.Images['v0.1.0']
 
-			const res = await repo.manifests.get(ref).result()
+			const res = await repo.manifests.get(ref)
 			expect(res.raw.status).to.eq(200)
 
 			const opaque = res.unwrap()
@@ -111,7 +111,7 @@ describe.concurrent('api v2', async () => {
 			expect(v).containSubset(manifest)
 		})
 		test('404', async () => {
-			const res = await repo.manifests.get('not-exists').result()
+			const res = await repo.manifests.get('not-exists')
 			expect(res.raw.status).to.eq(404)
 
 			const errors = res.unwrapOr((_, errors) => errors)
@@ -122,7 +122,7 @@ describe.concurrent('api v2', async () => {
 	describe.concurrent(title('end-4a', 'POST', 'blobs/uploads'), () => {
 		test('202', async ctx => {
 			const repo = getRepo(ctx)
-			const res = await repo.blobs.initUpload().result()
+			const res = await repo.blobs.initUpload()
 			expect(res.raw.status).to.eq(202)
 			const v = res.unwrap()
 			expect(v.location).to.be.exist
@@ -133,7 +133,7 @@ describe.concurrent('api v2', async () => {
 			const { chunk, digest } = T.asset.Images['v0.1.0']
 
 			const repo = getRepo(ctx)
-			const res = await repo.blobs.upload(digest, chunk).result()
+			const res = await repo.blobs.upload(digest, chunk)
 			expect(res.raw.status).to.eq(201)
 			const v = res.unwrap()
 			expect(v.location).to.be.exist
@@ -146,7 +146,7 @@ describe.concurrent('api v2', async () => {
 			const repo = getRepo(ctx)
 			const { location } = await repo.blobs.initUpload().unwrap()
 
-			const res = await repo.blobs.uploadChunk(location, chunk).result()
+			const res = await repo.blobs.uploadChunk(location, chunk)
 			expect(res.raw.status).to.eq(202)
 			const v = res.unwrap()
 			expect(v.location).to.be.exist
@@ -157,7 +157,7 @@ describe.concurrent('api v2', async () => {
 			const repo = getRepo(ctx)
 			const { location } = await repo.blobs.initUpload().unwrap()
 
-			const res = await repo.blobs.uploadChunk(location, chunk.withPos(1)).result()
+			const res = await repo.blobs.uploadChunk(location, chunk.withPos(1))
 			expect(res.raw.status).to.eq(416)
 
 			// The spec does not define which code is reported for it; zot says
@@ -174,7 +174,7 @@ describe.concurrent('api v2', async () => {
 			const repo = getRepo(ctx)
 			const { location } = await repo.blobs.initUpload().unwrap()
 
-			const res = await repo.blobs.closeUpload(location, digest, chunk).result()
+			const res = await repo.blobs.closeUpload(location, digest, chunk)
 			expect(res.raw.status).to.eq(201)
 			const v = res.unwrap()
 			expect(v.location).to.be.exist
@@ -188,7 +188,7 @@ describe.concurrent('api v2', async () => {
 			await repo.blobs.upload(digest, chunk).unwrap()
 			await repo.blobs.upload(vnd.oci.empty.digest, T.asset.EmptyObjectData).unwrap()
 
-			const res = await repo.manifests.put(ref, manifest.mediaType, JSON.stringify(manifest)).result()
+			const res = await repo.manifests.put(ref, manifest.mediaType, JSON.stringify(manifest))
 			expect(res.raw.status).to.eq(201)
 			const v = res.unwrap()
 			expect(v.location).to.be.instanceOf(URL)
@@ -196,7 +196,7 @@ describe.concurrent('api v2', async () => {
 	})
 	describe.concurrent(title('end-8a', 'GET', 'tags/list'), () => {
 		test('200', async () => {
-			const res = await repo.tags.list().result()
+			const res = await repo.tags.list()
 			expect(res.raw.status).to.eq(200)
 
 			const v = res.unwrap()
@@ -207,7 +207,7 @@ describe.concurrent('api v2', async () => {
 			}
 		})
 		test('404', async () => {
-			const res = await client.repo('test/end-8a-not-exists').tags.list().result()
+			const res = await client.repo('test/end-8a-not-exists').tags.list()
 			expect(res.raw.status).to.eq(404)
 
 			const errors = res.unwrapOr((_, errors) => errors)
@@ -217,7 +217,7 @@ describe.concurrent('api v2', async () => {
 	})
 	describe.concurrent(title('end-8b', 'GET', 'tags/list?n=_&last=_'), () => {
 		test.runIf(T.env.Supports.tagPagination)('200', async () => {
-			const res = await repo.tags.list({ n: 2, last: 'v0.2.0' }).result()
+			const res = await repo.tags.list({ n: 2, last: 'v0.2.0' })
 			expect(res.raw.status).to.eq(200)
 
 			const v = res.unwrap()
@@ -227,7 +227,7 @@ describe.concurrent('api v2', async () => {
 		})
 		test.runIf(T.env.Supports.unknownRepository)('404', async ctx => {
 			const repo = getRepo(ctx, 'end-8b-not-exists')
-			const res = await repo.tags.list({ n: 2, last: 'v0.2.0' }).result()
+			const res = await repo.tags.list({ n: 2, last: 'v0.2.0' })
 			expect(res.raw.status).to.eq(404)
 
 			const errors = res.unwrapOr((_, errors) => errors)
@@ -248,13 +248,13 @@ describe.concurrent('api v2', async () => {
 			const digest = await T.hash(bytes)
 			await repo.manifests.put(digest, vnd.oci.image.manifestV1, JSON.stringify(image.manifest)).unwrap()
 
-			const res = await repo.manifests.delete(digest).result()
+			const res = await repo.manifests.delete(digest)
 			expect(res.raw.status).to.eq(202)
 
 			res.unwrap()
 		})
 		test('404', async () => {
-			const res = await repo.manifests.delete(T.asset.HashOfNotExists).result()
+			const res = await repo.manifests.delete(T.asset.HashOfNotExists)
 			expect(res.raw.status).to.eq(404)
 		})
 	})
@@ -265,13 +265,13 @@ describe.concurrent('api v2', async () => {
 			const repo = getRepo(ctx)
 			await repo.blobs.upload(digest, chunk).unwrap()
 
-			const res = await repo.blobs.delete(digest).result()
+			const res = await repo.blobs.delete(digest)
 			expect(res.raw.status).to.eq(202)
 
 			res.unwrap()
 		})
 		test('404', async () => {
-			const res = await repo.blobs.delete(T.asset.HashOfNotExists).result()
+			const res = await repo.blobs.delete(T.asset.HashOfNotExists)
 			expect(res.raw.status).to.eq(404)
 		})
 	})
@@ -281,7 +281,7 @@ describe.concurrent('api v2', async () => {
 
 			const repo = getRepo(ctx)
 			// `from` is the repository that holds the blob, not a reference of it.
-			const res = await repo.blobs.mount(digest, Repo).result()
+			const res = await repo.blobs.mount(digest, Repo)
 			expect(res.raw.status).to.eq(201)
 
 			res.unwrap()
@@ -291,7 +291,7 @@ describe.concurrent('api v2', async () => {
 		test('200', async () => {
 			const { manifestDigest } = T.asset.Images['v0.1.0']
 
-			const res = await repo.referrers.get(manifestDigest).result()
+			const res = await repo.referrers.get(manifestDigest)
 			expect(res.raw.status).to.eq(200)
 
 			const v = res.unwrap()
@@ -316,7 +316,7 @@ describe.concurrent('api v2', async () => {
 		})
 		test.runIf(supportsReferrers)('400', async () => {
 			// It is a well-formed digest but the registry does not know the algorithm.
-			const res = await repo.referrers.get('foo:bar').result()
+			const res = await repo.referrers.get('foo:bar')
 			expect(res.raw.status).to.eq(400)
 		})
 	})
@@ -325,7 +325,7 @@ describe.concurrent('api v2', async () => {
 			const { manifestDigest } = T.asset.Images['v0.1.0']
 			const artifact = T.asset.Artifacts['application/foo']
 
-			const res = await repo.referrers.get(manifestDigest, { artifactType: artifact.manifest.artifactType }).result()
+			const res = await repo.referrers.get(manifestDigest, { artifactType: artifact.manifest.artifactType })
 			expect(res.raw.status).to.eq(200)
 
 			const v = res.unwrap()
@@ -349,7 +349,7 @@ describe.concurrent('api v2', async () => {
 			let { location } = await repo.blobs.initUpload().unwrap()
 			;({ location } = await repo.blobs.uploadChunk(location, new Chunk(Uint8Array.from([1, 2, 3]))).unwrap())
 
-			const res = await repo.blobs.getUploadStatus(location).result()
+			const res = await repo.blobs.getUploadStatus(location)
 			expect(res.raw.status).to.eq(204)
 			const v = res.unwrap()
 			expect(v.location).to.be.exist

@@ -26,7 +26,7 @@ describe.concurrent('helm', async () => {
 		await $`helm package gibbs`
 		expect(await fs.exists(PackageFilename)).to.be.true
 
-		const res = await repo.manifests.get('0.1.0').result()
+		const res = await repo.manifests.get('0.1.0')
 		if (res.raw.status !== 404) {
 			const data = res.unwrap()
 			const v = data.as(vnd.oci.image.manifestV1)
@@ -37,7 +37,7 @@ describe.concurrent('helm', async () => {
 			await Promise.all([repo.blobs.delete(Digest.parse(v.config.digest)), repo.blobs.delete(Digest.parse(v.layers[0].digest))])
 
 			{
-				const res = await repo.manifests.get('0.1.0').result()
+				const res = await repo.manifests.get('0.1.0')
 				expect(res.raw.status).to.eq(404)
 			}
 		}

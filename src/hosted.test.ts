@@ -34,7 +34,7 @@ describe.skipIf(!enabled)('hosted registries', () => {
 			expect(v.ok).to.be.true
 		})
 		test('reads the manifest as what it is', async () => {
-			const res = await repo.manifests.get(reference).result()
+			const res = await repo.manifests.get(reference)
 			expect(res.raw.status).to.eq(200)
 
 			// Whichever it is, it has to be one of the two.
@@ -54,11 +54,11 @@ describe.skipIf(!enabled)('hosted registries', () => {
 				expect.unreachable()
 			}
 
-			const res = await repo.blobs.get(index === undefined ? digest : vnd.oci.empty.digest).result()
+			const res = await repo.blobs.get(index === undefined ? digest : vnd.oci.empty.digest)
 			expect([200, 404]).to.contain(res.raw.status)
 		})
 		test('reports the referrers', async () => {
-			const res = await repo.referrers.get(`sha256:${'0'.repeat(64)}`).result()
+			const res = await repo.referrers.get(`sha256:${'0'.repeat(64)}`)
 			expect(res.raw.status).to.eq(200)
 
 			const v = res.unwrap()
@@ -97,7 +97,7 @@ describe.skipIf(!enabled)('hosted registries', () => {
 		test('accepts a blob and the manifest that points at it', async () => {
 			const layerDigest = await sha256(layer)
 			await repo.blobs.upload(vnd.oci.empty.digest, new Chunk(encode('{}'))).unwrap()
-			expect((await repo.blobs.upload(layerDigest, new Chunk(layer)).result()).raw.status).to.eq(201)
+			expect((await repo.blobs.upload(layerDigest, new Chunk(layer))).raw.status).to.eq(201)
 
 			const manifest = {
 				schemaVersion: 2,
@@ -105,7 +105,7 @@ describe.skipIf(!enabled)('hosted registries', () => {
 				config: vnd.oci.empty,
 				layers: [{ mediaType: 'application/octet-stream', digest: layerDigest.toString(), size: layer.byteLength }],
 			}
-			const res = await repo.manifests.put('v1', vnd.oci.image.manifestV1, encode(JSON.stringify(manifest))).result()
+			const res = await repo.manifests.put('v1', vnd.oci.image.manifestV1, encode(JSON.stringify(manifest)))
 			expect(res.raw.status).to.eq(201)
 		})
 		test('serves back what was pushed', async () => {
@@ -117,7 +117,7 @@ describe.skipIf(!enabled)('hosted registries', () => {
 			const v = await repo.manifests.get('v1').unwrap()
 			expect(v.as(vnd.oci.image.manifestV1)?.layers[0].digest).to.eq(layerDigest.toString())
 
-			const blob = await repo.blobs.get(layerDigest).result()
+			const blob = await repo.blobs.get(layerDigest)
 			expect(blob.raw.status).to.eq(200)
 		})
 	})
@@ -154,8 +154,8 @@ describe.skipIf(!enabled)('hosted registries', () => {
 			expect(v.as(vnd.oci.image.manifestV1)?.layers[0].digest).to.eq(layerDigest.toString())
 		})
 		test('is not served to anyone else', async () => {
-			expect((await anonymous.tags.list().result()).raw.status).to.eq(401)
-			expect((await anonymous.manifests.get('v1').result()).raw.status).to.eq(401)
+			expect((await anonymous.tags.list()).raw.status).to.eq(401)
+			expect((await anonymous.manifests.get('v1')).raw.status).to.eq(401)
 
 			// It cannot say whether it is there, which is not the same as
 			// saying that it is not.
@@ -174,7 +174,7 @@ describe.skipIf(!enabled)('hosted registries', () => {
 			const { location } = await authorized.blobs.initUpload().unwrap()
 			const { location: next } = await authorized.blobs.uploadChunk(location, new Chunk(data)).unwrap()
 
-			const res = await authorized.blobs.closeUpload(next, digest).result()
+			const res = await authorized.blobs.closeUpload(next, digest)
 			expect(res.raw.status).to.eq(201)
 			expect((await authorized.blobs.exists(digest)).ok).to.be.true
 		})
@@ -182,16 +182,16 @@ describe.skipIf(!enabled)('hosted registries', () => {
 			const data = encode('oci-client conformance single\n')
 			const digest = await sha256(data)
 
-			const res = await authorized.blobs.upload(digest, new Chunk(data)).result()
+			const res = await authorized.blobs.upload(digest, new Chunk(data))
 			expect(res.raw.status).to.eq(201)
 			expect((await authorized.blobs.exists(digest)).ok).to.be.true
 		})
 		test('deletes a manifest but not a blob', async () => {
 			await authorized.manifests.put('to-delete', vnd.oci.image.manifestV1, manifestBytes).unwrap()
-			expect((await authorized.manifests.delete('to-delete').result()).raw.status).to.eq(202)
+			expect((await authorized.manifests.delete('to-delete')).raw.status).to.eq(202)
 
 			// Docker Hub does not serve `end-10`; the blob stays where it is.
-			expect((await authorized.blobs.delete(layerDigest).result()).raw.status).to.eq(405)
+			expect((await authorized.blobs.delete(layerDigest)).raw.status).to.eq(405)
 		})
 	})
 })

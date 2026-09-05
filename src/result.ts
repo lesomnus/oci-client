@@ -20,7 +20,7 @@ export type OnError<U> = (res: Response, errors: readonly ErrorEntry[]) => U
  * without deciding what to do about an error:
  *
  * ```ts
- * const res = await repo.manifests.get('latest').result()
+ * const res = await repo.manifests.get('latest')
  * if (res.ok) {
  * 	res.value.as(vnd.oci.image.manifestV1)
  * } else {
@@ -85,22 +85,25 @@ class ErrorEntries extends Array<ErrorEntry> {
 }
 
 /**
- * A request that was sent, which is read by saying what is wanted of it.
+ * A request that was sent.
  *
- * It is not a promise: `unwrap` gives the value, `result` gives {@link Res}.
- * The response is read once however many times they are called.
+ * Awaiting it answers {@link Res}, which holds the response along with what it
+ * says; `unwrap` answers the value alone. The response is read once however
+ * many times either is asked for.
  *
  * @example
  * ```ts
+ * // The value, or `ResError` where the registry answered with an error.
  * const tags = await repo.tags.list().unwrap()
  *
- * const res = await repo.tags.list().result()
+ * // The response, to read before deciding what an error means.
+ * const res = await repo.manifests.get(reference)
  * if (res.raw.status === 404) {
- * 	// the repository is not there
+ * 	return undefined
  * }
  * ```
  */
-export class Req<T extends {}> {
+export class Req<T extends {}> implements PromiseLike<Res<T>> {
 	#res: Promise<Res<T>>
 
 	constructor(req: Promise<Response>, resolve: (raw: Response) => Promise<T>) {
@@ -129,9 +132,14 @@ export class Req<T extends {}> {
 		this.#res.catch(() => {})
 	}
 
-	/** What the registry answered, whether it is a result or an error. */
-	result(): Promise<Res<T>> {
-		return this.#res
+	// It is a `PromiseLike` on purpose, so that awaiting a request waits for the
+	// answer rather than handing back the request itself.
+	// biome-ignore lint/suspicious/noThenProperty: it is meant to be awaited
+	then<A = Res<T>, B = never>(
+		onfulfilled?: null | ((value: Res<T>) => A | PromiseLike<A>),
+		onrejected?: null | ((reason: unknown) => B | PromiseLike<B>),
+	): Promise<A | B> {
+		return this.#res.then(onfulfilled, onrejected)
 	}
 
 	/** @see {@link Res.unwrap} */

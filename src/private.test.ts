@@ -17,7 +17,7 @@ const authorized = repoOf(T.env.Credential)
 
 // The registry has to be configured to protect the repository, which is what
 // it answers rather than something to be declared.
-const protectedRepo = (await anonymous.tags.list().result()).raw.status === 401
+const protectedRepo = (await anonymous.tags.list()).raw.status === 401
 
 describe.skipIf(!protectedRepo)('a repository that requires an authorization', () => {
 	const image = T.asset.Images['v0.1.0']
@@ -33,17 +33,17 @@ describe.skipIf(!protectedRepo)('a repository that requires an authorization', (
 
 	describe('without a credential', () => {
 		test('is not listed', async () => {
-			expect((await anonymous.tags.list().result()).raw.status).to.eq(401)
+			expect((await anonymous.tags.list()).raw.status).to.eq(401)
 		})
 		test('does not serve a manifest', async () => {
-			expect((await anonymous.manifests.get(image.ref).result()).raw.status).to.eq(401)
+			expect((await anonymous.manifests.get(image.ref)).raw.status).to.eq(401)
 		})
 		test('does not say whether a manifest is there', async () => {
 			// It is not the same as saying that it is not.
 			await expect(anonymous.manifests.exists(image.ref)).rejects.toThrowError(ResError)
 		})
 		test('does not accept a blob', async () => {
-			const res = await anonymous.blobs.upload(image.digest, image.chunk).result()
+			const res = await anonymous.blobs.upload(image.digest, image.chunk)
 			expect(res.raw.status).to.eq(401)
 		})
 	})
@@ -58,7 +58,7 @@ describe.skipIf(!protectedRepo)('a repository that requires an authorization', (
 			expect(v.as(vnd.oci.image.manifestV1)?.layers[0].digest).to.eq(image.digest.toString())
 		})
 		test('serves a blob', async () => {
-			const res = await authorized.blobs.get(image.digest).result()
+			const res = await authorized.blobs.get(image.digest)
 			expect(res.raw.status).to.eq(200)
 			await expect(res.raw.text()).resolves.toBe(image.data)
 		})
@@ -69,13 +69,13 @@ describe.skipIf(!protectedRepo)('a repository that requires an authorization', (
 			const { location } = await authorized.blobs.initUpload().unwrap()
 			const { location: next } = await authorized.blobs.uploadChunk(location, new Chunk(data)).unwrap()
 
-			expect((await authorized.blobs.closeUpload(next, digest).result()).raw.status).to.eq(201)
+			expect((await authorized.blobs.closeUpload(next, digest)).raw.status).to.eq(201)
 			expect((await authorized.blobs.exists(digest)).ok).to.be.true
 		})
 	})
 
 	test('refuses a credential that is not the one it wants', async () => {
 		const wrong = repoOf({ username: T.env.Credential.username, password: 'not-the-password' })
-		expect((await wrong.tags.list().result()).raw.status).to.eq(401)
+		expect((await wrong.tags.list()).raw.status).to.eq(401)
 	})
 })

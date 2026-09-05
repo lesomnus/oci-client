@@ -9,7 +9,7 @@ describe('result', () => {
 
 	describe('what the registry answered', () => {
 		it('is a result where the response says so', async () => {
-			const res = await result(Promise.resolve(new Response(null, { status: 200 })), () => Promise.resolve({ n: 42 })).result()
+			const res = await result(Promise.resolve(new Response(null, { status: 200 })), () => Promise.resolve({ n: 42 }))
 
 			expect(res.raw.status).to.eq(200)
 			expect(res.ok).to.be.true
@@ -18,7 +18,7 @@ describe('result', () => {
 			expect(res.errors).to.be.undefined
 		})
 		it('is an error where the response says so', async () => {
-			const res = await result(jsonError([{ code: '42', message: 'nope', detail: '' }]), empty).result()
+			const res = await result(jsonError([{ code: '42', message: 'nope', detail: '' }]), empty)
 
 			expect(res.raw.status).to.eq(400)
 			expect(res.ok).to.be.false
@@ -33,7 +33,7 @@ describe('result', () => {
 
 			expect(await req.unwrap()).to.eql({ n: 42 })
 			expect(await req.unwrap()).to.eql({ n: 42 })
-			expect((await req.result()).raw.status).to.eq(200)
+			expect((await req).raw.status).to.eq(200)
 		})
 	})
 
@@ -62,7 +62,7 @@ describe('result', () => {
 		})
 		it('rejects `ResError` where the registry failed', async () => {
 			const req = result(Promise.resolve(new Response(null, { status: 500 })), empty)
-			await expect(req.result()).rejects.toThrowError(ResError)
+			await expect(req).rejects.toThrowError(ResError)
 		})
 		it('reports no entry where the body is not a well-formed error', async () => {
 			const req = result(
@@ -70,7 +70,7 @@ describe('result', () => {
 				empty,
 			)
 
-			const res = await req.result()
+			const res = await req
 			expect(res.ok).to.be.false
 			if (res.ok) expect.unreachable()
 			expect(res.errors).to.be.empty
