@@ -1,6 +1,8 @@
 import type { ReqInit, Transport } from '~/index'
 import { ClientV2 } from '~/index'
+import { of } from './index'
 import { V1 } from './v1'
+import { Zot } from './zot'
 
 // Answers like Docker Hub does.
 class Hub implements Transport {
@@ -29,7 +31,7 @@ class Hub implements Transport {
 					},
 					{
 						name: 'nginx/nginx-ingress',
-						description: '',
+						description: null,
 						pull_count: 1087037639,
 						star_count: 122,
 						is_trusted: false,
@@ -63,7 +65,8 @@ describe('ext search v1', () => {
 			official: true,
 		})
 	})
-	it('does not report an empty description', async () => {
+	it('does not report a description that is not one', async () => {
+		// `quay.io` reports it as `null` while Docker Hub reports it as "".
 		const [client] = make()
 		const v = await client.search('nginx').unwrap()
 		expect(v.repositories[1].description).to.be.undefined
@@ -87,5 +90,16 @@ describe('ext search v1', () => {
 	it('rejects a page before the first', () => {
 		const [client] = make()
 		expect(() => client.search('nginx', { page: 0 })).to.throw()
+	})
+})
+
+describe('ext search of', () => {
+	it('picks the extension that speaks the dialect', () => {
+		expect(of('zot')).to.eq(Zot)
+		expect(of('v1')).to.eq(V1)
+	})
+	it('picks nothing for a dialect that is not implemented', () => {
+		expect(of(undefined)).to.be.undefined
+		expect(of('something-else')).to.be.undefined
 	})
 })

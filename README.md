@@ -65,28 +65,48 @@ const other = new ClientV2('index.docker.io', {
 ```
 
 ### Know the Registry
-The spec does not require a registry to identify itself, so `detect` asks what
-it advertises first and falls back to how it answers. `flavor` is `undefined`
-where neither tells, which is the case for most of the hosted registries.
+`detect` tells what the registry can be asked for, which is what decides whether
+an extension is worth composing. It is not the same question as which
+implementation serves it: a *zot* built without its extensions is still *zot*
+yet serves no search, and `/v1/search` is served by *Docker Hub* and *quay.io*
+alike although neither says what it is.
 ```ts
-import { ClientV2 } from '@lesomnus/oci-client'
+import { ClientV2, ext } from '@lesomnus/oci-client'
 
-const v = await new ClientV2('localhost:5000').detect().unwrap()
-console.log(v)
-// {
-//   flavor: 'zot',
-//   version: 'v2.1.20',
-//   specVersion: '1.1.1',
-//   extensions: [ { name: '_zot', url: '...', endpoints: [ '/v2/_zot/ext/search', ... ] } ]
-// }
+const Domain = 'quay.io'
+
+const v = await new ClientV2(Domain).detect().unwrap()
+console.log(v.features)
+// { search: 'v1', catalog: true }
+
+// The dialect names the extension that speaks it, so the two compose a client
+// for whichever registry is on the other end.
+const Search = ext.search.of(v.features.search)
+if (Search !== undefined) {
+	const client = new (ClientV2.with(Search))(Domain)
+	const found = await client.search('prometheus', { n: 10 }).unwrap()
+}
 ```
 
-`discover` asks only for the extensions, which is a fact the registry states
-rather than a guess. A registry that does not implement the discovery answers
+What the registry advertises is read first since it is a fact it states, and
+what is not advertised is probed. `flavor` reports the implementation where it
+can be told, which most of the hosted registries do not say:
+
+| Registry          | `features.search` | `features.catalog` | `flavor`       |
+| ----------------- | ----------------- | ------------------ | -------------- |
+| *zot*             | `zot`             | `true`             | `zot` `v2.1.20` |
+| *zot* w/o ext.    | —                 | `true`             | `zot`          |
+| *distribution*    | —                 | `true`             | `distribution` |
+| *Docker Hub*      | `v1`              | — needs auth       | —              |
+| *quay.io*         | `v1`              | `true`             | —              |
+| *ghcr.io*         | —                 | — needs auth       | —              |
+| *registry.k8s.io* | —                 | `false`            | —              |
+
+`discover` asks only for the extensions the registry advertises, without
+probing. A registry that does not implement the discovery answers
 `404 Not Found`, which is reported as no extension.
 ```ts
 const { extensions } = await client.discover().unwrap()
-const searchable = extensions.some(e => e.endpoints.includes('/v2/_zot/ext/search'))
 ```
 
 ### Use Extensions

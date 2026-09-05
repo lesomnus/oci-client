@@ -1,3 +1,4 @@
+import type { ClientBase, ClientMixin } from '../../client'
 import type { Req } from '../../result'
 
 export type Opts = {
@@ -40,3 +41,11 @@ export type Res = {
 export interface Searchable {
 	search(query: string, opts?: Opts): Req<Res>
 }
+
+/**
+ * Extension that adds {@link Searchable} to a client, whichever dialect it
+ * speaks. Note that it is only the search; an extension may offer more than
+ * that on its own, such as the GraphQL of {@link Zot}.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: it is what `ClientExtension` is
+export type SearchExtension = ClientMixin<new (...args: any[]) => ClientBase & Searchable>

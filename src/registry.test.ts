@@ -33,6 +33,18 @@ describe('detect', () => {
 		expect(v.version).to.match(/^v\d+\.\d+\.\d+/)
 		expect(v.specVersion).to.match(/^\d+\.\d+\.\d+/)
 	})
+	it('tells what the registry can be asked for', async () => {
+		const v = await client.detect().unwrap()
+
+		// A zot built without its extensions serves no search although it is
+		// still zot, so what is advertised decides rather than what it is.
+		const advertised = v.extensions.some(e => e.endpoints.some(p => p.endsWith('/ext/search')))
+		expect(v.features.search).to.eq(advertised ? 'zot' : undefined)
+
+		// Every registry under test serves the catalog without asking for an
+		// authorization.
+		expect(v.features.catalog).to.be.true
+	})
 	it('lists nothing where the registry does not implement the discovery', async () => {
 		const v = await client.discover().unwrap()
 		expect(v.extensions).to.be.instanceOf(Array)
@@ -81,6 +93,40 @@ describe('detect without a registry', () => {
 
 		expect(v.flavor).to.eq('zot')
 		expect(v.version).to.be.undefined
+	})
+	it('tells the search dialect of a registry that serves "/v1/search"', async () => {
+		// It is not owned by one implementation: Docker Hub and quay.io both
+		// serve it while neither says what it is.
+		const client = new ClientV2('x.com', {
+			transport: {
+				fetch(resource) {
+					const u = new URL(resource instanceof Request ? resource.url : resource)
+					if (u.pathname === '/v1/search') {
+						return Promise.resolve(Response.json({ num_results: 0, results: [] }))
+					}
+					if (u.pathname === '/v2/_catalog') {
+						return Promise.resolve(new Response(null, { status: 401 }))
+					}
+
+					return Promise.resolve(new Response(null, { status: 404 }))
+				},
+			},
+		})
+
+		const v = await client.detect().unwrap()
+		expect(v.features.search).to.eq('v1')
+		// It is served but it would not say what it holds.
+		expect(v.features.catalog).to.be.undefined
+		expect(v.flavor).to.be.undefined
+	})
+	it('tells that the catalog is not served', async () => {
+		const client = new ClientV2('x.com', {
+			transport: { fetch: () => Promise.resolve(new Response(null, { status: 404 })) },
+		})
+
+		const v = await client.detect().unwrap()
+		expect(v.features.catalog).to.be.false
+		expect(v.features.search).to.be.undefined
 	})
 	it('reports no extension where the discovery answers "404 Not Found"', async () => {
 		const client = new ClientV2('x.com', {

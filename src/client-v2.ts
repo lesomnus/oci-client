@@ -4,7 +4,7 @@ import { ClientBase, type ClientExtension, type ClientInit, type ClientMixin } f
 import { ResError } from './error'
 import { Ref } from './ref'
 import Patterns from './regexp'
-import { type Extension, type ExtensionList, flavorOf, type Implementation, ZotExtension } from './registry'
+import { type Extension, type ExtensionList, featuresOf, flavorOf, type Implementation, ZotExtension } from './registry'
 import { type Req, result, wrap } from './result'
 import { FetchTransport, type Transport, TransportChain } from './transport'
 
@@ -81,26 +81,27 @@ function clientV2<T extends ClientExtension>(Base: T) {
 			const u = `https://${this.domain}/v2/`
 			return wrap(this.transport.fetch(u), async res => {
 				const { extensions } = await this.discover().unwrap()
+				const features = await featuresOf(this.transport, this.domain, extensions)
 
 				const zot = extensions.find(e => e.name === ZotExtension)
 				if (zot === undefined) {
-					return { flavor: flavorOf(res), extensions }
+					return { features, flavor: flavorOf(res), extensions }
 				}
 
 				// zot reports its version on the management endpoint, which it
 				// only serves where the extension is enabled.
 				const mgmt = zot.endpoints.find(e => e.endsWith('/mgmt'))
 				if (mgmt === undefined) {
-					return { flavor: 'zot', extensions }
+					return { features, flavor: 'zot', extensions }
 				}
 
 				const v = await this.transport.fetch(`https://${this.domain}${mgmt}`)
 				if (v.status >= 400) {
-					return { flavor: 'zot', extensions }
+					return { features, flavor: 'zot', extensions }
 				}
 
 				const { releaseTag, distSpecVersion } = await v.json()
-				return { flavor: 'zot', version: releaseTag, specVersion: distSpecVersion, extensions }
+				return { features, flavor: 'zot', version: releaseTag, specVersion: distSpecVersion, extensions }
 			})
 		}
 

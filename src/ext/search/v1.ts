@@ -7,7 +7,8 @@ type SearchV1Res = {
 	num_results?: number
 	results?: {
 		name: string
-		description?: string
+		// `quay.io` reports no description as `null`.
+		description?: null | string
 		star_count?: number
 		pull_count?: number
 		is_official?: boolean
@@ -45,8 +46,8 @@ export function V1(Base: ClientExtension) {
 					total: v.num_results,
 					repositories: (v.results ?? []).map(r => ({
 						name: r.name,
-						// An empty description is not a description.
-						description: r.description === '' ? undefined : r.description,
+						// Neither an empty description nor a missing one is one.
+						description: r.description ? r.description : undefined,
 						stars: r.star_count,
 						downloads: r.pull_count,
 						official: r.is_official,
