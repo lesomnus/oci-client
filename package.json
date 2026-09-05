@@ -1,6 +1,6 @@
 {
 	"name": "@lesomnus/oci-client",
-	"version": "0.0.1",
+	"version": "1.0.0",
 	"description": "Client implementation of OCI Distribution for Web",
 	"keywords": [
 		"oci",

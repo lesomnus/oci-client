@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # npm authenticates over OIDC through trusted publishing, so no token is held
+  # anywhere; the package names this workflow as a publisher it accepts.
+  id-token: write
+
+jobs:
+  publish:
+    name: publish to npm
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      # Trusted publishing needs npm 11.5.1 or later.
+      - run: npm install --global npm@latest
+
+      - name: Check the tag says the version that is published
+        if: github.event_name == 'push'
+        run: |
+          version="v$(node -p 'require("./package.json").version')"
+          if [ "$version" != "${{ github.ref_name }}" ]; then
+              echo "the tag ${{ github.ref_name }} does not name the version $version"
+              exit 1
+          fi
+
+      # `prepare` builds what is published, so this is what ends up in the
+      # tarball; `--dry-run` first so a bad package fails before it is out.
+      - run: npm clean-install
+      - run: npx biome ci .
+      - run: npm publish --dry-run
+      - run: npm publish
