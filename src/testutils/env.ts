@@ -4,6 +4,24 @@ export const Domain = import.meta.env.REGISTRY_DOMAIN ?? 'registry:5000'
 export const Kind = import.meta.env.REGISTRY_KIND ?? 'zot'
 
 /**
+ * Whether to run the tests against the hosted registries, which are not run by
+ * default since they reach out of the machine and are rate limited.
+ */
+export const Hosted = import.meta.env.REGISTRY_HOSTED === '1'
+
+/**
+ * Credential of the account that owns {@link HubRepo}, without which the tests
+ * that write or read what is not public are skipped.
+ */
+export const HubCredential =
+	import.meta.env.REGISTRY_HUB_USERNAME && import.meta.env.REGISTRY_HUB_TOKEN
+		? { username: import.meta.env.REGISTRY_HUB_USERNAME, password: import.meta.env.REGISTRY_HUB_TOKEN }
+		: undefined
+
+/** Private repository on Docker Hub that the tests push to and read back. */
+export const HubRepo = import.meta.env.REGISTRY_HUB_REPO ?? 'lesomnus/oci-client-test'
+
+/**
  * Behaviors that not every registry has, either because the spec leaves them
  * optional or because the implementation does not comply with it.
  * The tests cannot expect them from every registry so they are declared here.

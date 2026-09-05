@@ -52,8 +52,14 @@ export default defineConfig({
 				envPrefix: ['VITE_', 'REGISTRY_'],
 				test: {
 					name: 'browser',
-					// `helm` is a CLI so it cannot be executed in the browser.
-					exclude: [...defaultExclude, 'src/media-types/vnd/cncf/helm.test.ts'],
+					exclude: [
+						...defaultExclude,
+						// `helm` is a CLI so it cannot be executed in the browser.
+						'src/media-types/vnd/cncf/helm.test.ts',
+						// The credential of the hosted registries would be
+						// inlined into the bundle that is served to the browser.
+						'src/hosted.test.ts',
+					],
 					globals: true,
 					fileParallelism: true,
 					browser: {

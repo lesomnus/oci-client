@@ -133,6 +133,11 @@ versions of *Node.js*, in *Node.js* and in the browser.
 | [distribution](https://distribution.github.io/distribution/) | `v3.1.1`  |
 | [distribution](https://distribution.github.io/distribution/) | `v2.8.3`  |
 
+*Docker Hub* and *ghcr.io* are tested on a schedule rather than on every change
+since they are outside this repository and are rate limited. Reading a public
+image is covered on both, and writing to, deleting from and reading a private
+repository is covered on *Docker Hub*.
+
 The spec leaves some of the behaviors to the registry and not every registry
 complies with all of it. This client smooths over what it can:
 
@@ -144,6 +149,11 @@ complies with all of it. This client smooths over what it can:
 | `end-8b` paginates the tags by `n` and `last`           | ✅    | ✅                | ❌ lists them all |
 | `end-8b` `404` for a repository that does not exist     | ✅    | ❌ answers `200`  | ✅                |
 | `end-12` Referrers API                                  | ✅    | ❌                | ❌                |
+
+*Docker Hub* serves all of it but `end-10`, which answers `405 Method Not
+Allowed`: a manifest can be deleted while the blob it pointed at stays.
+`ghcr.io` answers `404 Not Found` for a manifest request that does not say what
+it accepts, so the client always states it.
 
 `end-4b` and `end-12` are handled by the client, so a blob is uploaded and the
 referrers are listed whichever registry is on the other end. The rest is the
