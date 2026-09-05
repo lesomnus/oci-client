@@ -1,7 +1,18 @@
 import { createSHA256 } from 'hash-wasm'
 import type { TestContext } from 'vitest'
 
-import { Accept, Chunk, ClientV2, Codes, FetchTransport, type Hasher, type ReqInit, type Transport, Unsecure } from '~/index'
+import {
+	Accept,
+	Chunk,
+	ClientV2,
+	Codes,
+	FetchTransport,
+	type Hasher,
+	ManifestMediaTypes,
+	type ReqInit,
+	type Transport,
+	Unsecure,
+} from '~/index'
 import { vnd } from '~/media-types'
 import T from '~/testutils'
 
@@ -416,6 +427,31 @@ describe('ManifestsApiV2 accepts', () => {
 
 		await client.repo('foo/bar').manifests.get('latest').unwrap()
 		expect(seen[0]).to.eq(vnd.oci.image.manifestV1)
+	})
+
+	// Over 128 bytes an "Accept" is no longer a CORS-safelisted request header,
+	// so a browser preflights the request and a registry that does not allow
+	// "accept" in `Access-Control-Allow-Headers`, as zot does not, rejects it.
+	// The media types are ASCII so the length of the value is its size.
+	const CorsSafelistLimit = 128
+
+	it('offers more than a browser can send without a preflight', () => {
+		// No subset both fits and reads every registry correctly, so the list
+		// stays correct and the narrowing below is offered instead.
+		expect(ManifestMediaTypes.join(', ').length).toBeGreaterThan(CorsSafelistLimit)
+	})
+	it('is narrowed by the `accept` option', async () => {
+		const accept = [vnd.oci.image.indexV1, vnd.docker.distribution.manifestListV2]
+		expect(accept.join(', ').length).toBeLessThanOrEqual(CorsSafelistLimit)
+
+		const [repo, seen] = record()
+		await repo.manifests.get('latest', { accept }).unwrap()
+		expect(seen[0]).to.eq(accept.join(', '))
+	})
+	it('is narrowed by the `accept` option on a "HEAD" as well', async () => {
+		const [repo, seen] = record()
+		await repo.manifests.exists('latest', { accept: [vnd.oci.image.indexV1] })
+		expect(seen[0]).to.eq(vnd.oci.image.indexV1)
 	})
 })
 

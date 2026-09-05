@@ -47,6 +47,55 @@ console.log(index?.manifests[0].platform?.os)
 // "linux"
 ```
 
+### Read a Manifest in the Browser
+
+`manifests.get` and `manifests.exists` state every manifest media type this
+client can read. Joined that is 196 bytes, and an `Accept` over 128 bytes is no
+longer [CORS-safelisted], so the browser preflights the request; a registry that
+does not allow `accept` in `Access-Control-Allow-Headers`, which *zot* does not,
+then rejects it before it is sent.
+
+No shorter list is also correct — the shortest one every registry answers
+correctly is 152 bytes — so narrowing it is a choice the caller makes, for one
+call or for a whole client:
+
+```ts
+import { Accept, ClientV2 } from '@lesomnus/oci-client'
+import { vnd } from '@lesomnus/oci-client/media-types'
+
+const accept = [vnd.oci.image.indexV1, vnd.docker.distribution.manifestListV2] // 98 bytes
+
+// For one call.
+await client.repo('library/node').manifests.get('latest', { accept }).unwrap()
+
+// For every manifest this client reads.
+const client = new ClientV2('index.docker.io', {
+  transport: [new Accept({ manifests: accept })],
+})
+```
+
+What each registry answered for `latest`, with the default list and with the 98
+byte one above:
+
+| Registry            | default              | narrowed             |
+| ------------------- | -------------------- | -------------------- |
+| *zot*               | blocked in a browser | OCI index            |
+| *Docker Hub*        | as stored            | as stored            |
+| *ghcr.io*           | OCI index            | OCI index            |
+| *quay.io*           | Docker manifest list | Docker manifest list |
+| *registry.k8s.io*   | Docker manifest list | Docker manifest list |
+| *mcr.microsoft.com* | Docker manifest v2   | Docker schema 1      |
+
+Only *mcr.microsoft.com* answers worse, and only where the image has no manifest
+list. Dropping the header entirely is not the way out: *ghcr.io* and
+*registry.k8s.io* answer `404 Not Found` when nothing, `*/*` or `application/*`
+is accepted.
+
+Nothing else this client sends is over the limit, and outside the browser none
+of it applies.
+
+[CORS-safelisted]: https://fetch.spec.whatwg.org/#cors-safelisted-request-header
+
 ### Read a Response
 Awaiting a request answers the response along with what it says; `unwrap` skips
 to the value and throws where the registry answered with an error.
@@ -195,8 +244,9 @@ all of it. A dash is a behavior that is not covered against that registry.
 `end-4b` and `end-12` are handled by the client, so a blob is uploaded and the
 referrers are listed whichever registry is on the other end. `ghcr.io` answers
 `404 Not Found` for a manifest request that does not say what it accepts, so the
-client always states it. The rest is the registry answering differently for the
-same request.
+client always states it; see [Read a Manifest in the
+Browser](#read-a-manifest-in-the-browser) for what that costs there. The rest is
+the registry answering differently for the same request.
 
 ### Which extension a registry answers
 

@@ -528,19 +528,51 @@ export class BlobsApiV2 extends ApiBase<'blobs'> {
 }
 
 /**
- * Media types of a manifest that this client can read.
+ * Media types of a manifest that this client can read, sent as "Accept" by
+ * {@link ManifestsApiV2.get} and {@link ManifestsApiV2.exists}.
  *
  * A registry may answer `404 Not Found` for a manifest it cannot represent as
  * one of the accepted media types, so what can be read is always stated;
- * `ghcr.io` does exactly that where nothing is accepted. The {@link Accept}
- * middleware overrides it where the caller wants something narrower.
+ * `ghcr.io` and `registry.k8s.io` do exactly that. Others negotiate rather than
+ * refuse: `quay.io` and `mcr.microsoft.com` fall back to a Docker schema 1
+ * manifest, which this client does not model, when no schema 2 type is offered.
+ * Every entry is load-bearing on some registry.
+ *
+ * Joined it is 196 bytes, over the 128-byte limit that keeps "Accept" a
+ * CORS-safelisted request header, so a browser preflights the request and a
+ * registry that does not allow "accept" in `Access-Control-Allow-Headers`
+ * rejects it. No subset both stays under the limit and reads every registry
+ * correctly; the shortest correct one is 152 bytes. Where the preflight is the
+ * problem, narrow this list for a single call with the `accept` option or for
+ * a whole client with the {@link Accept} middleware, and accept that some
+ * registry answers differently.
  */
-const Accepts = [
+export const ManifestMediaTypes: readonly MediaType[] = [
 	vnd.oci.image.indexV1, //
 	vnd.oci.image.manifestV1,
 	vnd.docker.distribution.manifestListV2,
 	vnd.docker.distribution.manifestV2,
-].join(', ')
+]
+
+/** Media types a caller is willing to read a manifest as. */
+export type ManifestAcceptOpts = {
+	/**
+	 * Overrides {@link ManifestMediaTypes} for this request.
+	 *
+	 * @example
+	 * ```ts
+	 * // Short enough to stay CORS-safelisted, so no preflight.
+	 * repo.manifests.get('latest', {
+	 *   accept: [vnd.oci.image.indexV1, vnd.docker.distribution.manifestListV2],
+	 * })
+	 * ```
+	 */
+	accept?: readonly MediaType[]
+}
+
+function acceptOf(opts: ManifestAcceptOpts | undefined): Record<string, string> {
+	return { Accept: (opts?.accept ?? ManifestMediaTypes).join(', ') }
+}
 
 export class ManifestsApiV2 extends ApiBase<'manifests'> {
 	constructor(
@@ -563,10 +595,10 @@ export class ManifestsApiV2 extends ApiBase<'manifests'> {
 	 *
 	 * @see Spec *{@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#checking-if-content-exists-in-the-registry | Checking if content exists in the registry}* `end-3`.
 	 */
-	exists(reference?: Reference) {
+	exists(reference?: Reference, opts?: ManifestAcceptOpts) {
 		reference = this.#fallbackReference(reference)
 		const u = this.#u(reference)
-		return this._head(u, { reference }, { headers: { Accept: Accepts } })
+		return this._head(u, { reference }, { headers: acceptOf(opts) })
 	}
 
 	/**
@@ -574,7 +606,10 @@ export class ManifestsApiV2 extends ApiBase<'manifests'> {
 	 *
 	 * @see Spec *{@link https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pulling-manifests | Pulling manifests}* `end-3`.
 	 */
-	get(reference?: Reference): Req<{
+	get(
+		reference?: Reference,
+		opts?: ManifestAcceptOpts,
+	): Req<{
 		/**
 		 * Returns a structured message as-is with the type defined by the given `mediaType`.
 		 * Note that it does not validate or modify the message.
@@ -593,7 +628,7 @@ export class ManifestsApiV2 extends ApiBase<'manifests'> {
 	}> {
 		reference = this.#fallbackReference(reference)
 		const u = this.#u(reference)
-		const req = this.exec(u, { reference }, { method: 'GET', headers: { Accept: Accepts } })
+		const req = this.exec(u, { reference }, { method: 'GET', headers: acceptOf(opts) })
 		return result(req, res =>
 			res.json().then(v => ({
 				...v,
