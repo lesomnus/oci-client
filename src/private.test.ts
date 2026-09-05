@@ -1,6 +1,6 @@
-import { Chunk, ClientV2, FetchTransport, ResError, TransportAuthorizer, Unsecure } from '~/index'
-import { vnd } from '~/media-types'
-import T from '~/testutils'
+import { Chunk, ClientV2, FetchTransport, ResError, TransportAuthorizer, Unsecure } from '#src/index'
+import { vnd } from '#src/media-types'
+import T from '#src/testutils'
 
 const Repo = T.env.PrivateRepo
 

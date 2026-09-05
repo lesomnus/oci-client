@@ -1,6 +1,6 @@
-import { Chunk, ClientV2, Digest, ext, ResError } from '~/index'
-import { vnd } from '~/media-types'
-import T from '~/testutils'
+import { Chunk, ClientV2, Digest, ext, ResError } from '#src/index'
+import { vnd } from '#src/media-types'
+import T from '#src/testutils'
 
 // These reach the registries that are actually out there, which is the only
 // way to find what they do differently from the ones a test can run. They are

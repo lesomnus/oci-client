@@ -1,4 +1,4 @@
-import { mediaType } from '~/media-types/t'
+import { mediaType } from '#src/media-types/t'
 
 /**
  * @see {@link https://helm.sh/blog/helm-oci-mediatypes/#helm-media-types | Helm media types}

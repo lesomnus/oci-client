@@ -1,5 +1,5 @@
-import type { ReqInit, Transport } from '~/index'
-import { ClientV2 } from '~/index'
+import type { ReqInit, Transport } from '#src/index'
+import { ClientV2 } from '#src/index'
 import { of } from './index'
 import { V1 } from './v1'
 import { Zot } from './zot'

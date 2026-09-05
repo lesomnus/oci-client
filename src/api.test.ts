@@ -12,9 +12,9 @@ import {
 	type ReqInit,
 	type Transport,
 	Unsecure,
-} from '~/index'
-import { vnd } from '~/media-types'
-import T from '~/testutils'
+} from '#src/index'
+import { vnd } from '#src/media-types'
+import T from '#src/testutils'
 
 function title(code: string, method: string, endpoint: string) {
 	return `${code.padEnd('end-NNa'.length)} ${method.padStart('DELETE'.length)} ${endpoint}`

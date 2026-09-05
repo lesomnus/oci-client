@@ -8,6 +8,9 @@
 		"declaration": true,
 		"declarationMap": true,
 		"skipLibCheck": true,
+		// Resolves "#src/*" to the source while this package is built; see the
+		// "imports" field of the package manifest.
+		"customConditions": ["oci-client-source"],
 
 		/* Bundler mode */
 		"allowSyntheticDefaultImports": true,
@@ -20,11 +23,7 @@
 		/* Linting */
 		"strict": true,
 		"noUnusedLocals": true,
-		"noFallthroughCasesInSwitch": true,
-
-		"paths": {
-			"~/*": ["./src/*"]
-		}
+		"noFallthroughCasesInSwitch": true
 	},
 	"include": ["src"],
 	"references": [{ "path": "./tsconfig.node.json" }]

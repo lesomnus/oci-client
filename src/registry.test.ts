@@ -1,5 +1,5 @@
-import { ClientV2, FetchTransport, flavorOf, type ReqInit, type Transport, Unsecure } from '~/index'
-import T from '~/testutils'
+import { ClientV2, FetchTransport, flavorOf, type ReqInit, type Transport, Unsecure } from '#src/index'
+import T from '#src/testutils'
 
 describe('detect', () => {
 	const client = new ClientV2(T.env.Domain, {

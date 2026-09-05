@@ -1,8 +1,8 @@
 import 'zx/globals'
 
-import { ClientV2, Digest, FetchTransport, Unsecure } from '~/index'
-import { vnd } from '~/media-types'
-import T from '~/testutils'
+import { ClientV2, Digest, FetchTransport, Unsecure } from '#src/index'
+import { vnd } from '#src/media-types'
+import T from '#src/testutils'
 
 $.quiet = true
 

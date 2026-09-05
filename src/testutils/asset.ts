@@ -1,5 +1,5 @@
-import { Chunk } from '~/index'
-import { vnd } from '~/media-types'
+import { Chunk } from '#src/index'
+import { vnd } from '#src/media-types'
 
 import { encodeString, hash, toRecord } from './misc'
 

@@ -1,6 +1,6 @@
-import { ClientV2, FetchTransport, Unsecure } from '~/index'
-import { vnd } from '~/media-types'
-import T from '~/testutils'
+import { ClientV2, FetchTransport, Unsecure } from '#src/index'
+import { vnd } from '#src/media-types'
+import T from '#src/testutils'
 import { Catalog } from './catalog'
 
 describe.concurrent('ext catalog', async () => {

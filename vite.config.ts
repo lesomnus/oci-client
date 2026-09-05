@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { dirname, relative, resolve } from 'node:path'
 
 import { playwright } from '@vitest/browser-playwright'
+import { defaultClientConditions, defaultServerConditions } from 'vite'
 import dts from 'vite-plugin-dts'
 import { defaultExclude, defineConfig } from 'vitest/config'
 
@@ -9,37 +10,29 @@ const SrcRoot = resolve(import.meta.dirname, 'src')
 const OutRoot = resolve(import.meta.dirname, 'dist')
 
 /**
- * Rewrites the module specifiers of an emitted declaration file so that a
- * consumer can resolve them.
+ * Rewrites the relative module specifiers of an emitted declaration file so
+ * that a consumer can resolve them.
  *
- * Two kinds of specifier are not resolvable as emitted:
- *
- * - `~/*`, the path alias of this repository. The alias is rewritten in import
- *   statements but not in the `import("...")` types that the declaration
- *   emitter synthesizes for an inferred type.
- * - A relative specifier without an extension, which "moduleResolution":
- *   "nodenext" rejects, and which is ambiguous where a sibling file and a
- *   directory share a name; `./media-types` is both `media-types.js`, the
- *   bundle, and `media-types/`, the declarations.
+ * A relative specifier is emitted without an extension, which
+ * "moduleResolution": "nodenext" rejects outright, and which is ambiguous where
+ * a sibling file and a directory share a name; `./media-types` is both
+ * `media-types.js`, the bundle, and `media-types/`, the declarations, and the
+ * file wins.
  *
  * The declarations mirror the source tree, so a specifier is resolved against
  * `src` and emitted back as an explicit relative path with a `.js` extension.
+ * `#src/*` needs none of this: the package manifest defines it, so it resolves
+ * wherever the declarations end up.
  */
 function resolveSpecifiers(filePath: string, content: string) {
 	// Map the emitted file back onto the source directory it was emitted from.
 	const dir = resolve(SrcRoot, relative(OutRoot, dirname(filePath)))
 
 	const rewrite = (spec: string) => {
-		let target: string
-		if (spec.startsWith('~/')) {
-			target = resolve(SrcRoot, spec.slice(2))
-		} else if (spec.startsWith('.')) {
-			target = resolve(dir, spec)
-		} else {
-			// A bare specifier; it is resolved by the consumer.
-			return spec
-		}
+		// A bare specifier, `#src/*` included, is resolved by the consumer.
+		if (!spec.startsWith('.')) return spec
 
+		let target = resolve(dir, spec)
 		if (!existsSync(`${target}.ts`)) {
 			if (!existsSync(resolve(target, 'index.ts'))) {
 				// Left as emitted it would only fail in a consumer's build, so
@@ -71,7 +64,11 @@ export default defineConfig({
 		}),
 	],
 	resolve: {
-		tsconfigPaths: true,
+		conditions: ['oci-client-source', ...defaultClientConditions],
+	},
+	ssr: {
+		// The "node" test project resolves through the SSR conditions.
+		resolve: { conditions: ['oci-client-source', ...defaultServerConditions] },
 	},
 	// `REGISTRY_DOMAIN` is exposed to the tests through `import.meta.env`
 	// since `process` is not available in the browser.
@@ -99,7 +96,6 @@ export default defineConfig({
 		},
 		projects: [
 			{
-				resolve: { tsconfigPaths: true },
 				envPrefix: ['VITE_', 'REGISTRY_'],
 				test: {
 					name: 'node',
@@ -108,7 +104,6 @@ export default defineConfig({
 				},
 			},
 			{
-				resolve: { tsconfigPaths: true },
 				envPrefix: ['VITE_', 'REGISTRY_'],
 				test: {
 					name: 'browser',
