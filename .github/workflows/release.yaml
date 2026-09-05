@@ -38,8 +38,16 @@ jobs:
           fi
 
       # `prepare` builds what is published, so this is what ends up in the
-      # tarball; `--dry-run` first so a bad package fails before it is out.
+      # tarball; packing it first tells what it holds before it is uploaded.
       - run: npm clean-install
       - run: npx biome ci .
-      - run: npm publish --dry-run
-      - run: npm publish
+      - run: npm pack --dry-run
+
+      # It is staged rather than published: nobody can install it until a
+      # maintainer reviews it and approves it with 2FA.
+      #
+      #     npm stage list
+      #     npm stage view <stage-id>
+      #     npm stage download <stage-id>
+      #     npm stage approve <stage-id>
+      - run: npm stage publish
