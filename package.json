@@ -1,6 +1,6 @@
 {
 	"name": "@lesomnus/oci-client",
-	"version": "1.0.1",
+	"version": "1.0.0",
 	"description": "Client implementation of OCI Distribution for Web",
 	"keywords": [
 		"oci",
@@ -31,30 +31,40 @@
 	"sideEffects": false,
 	"main": "./dist/main.cjs",
 	"module": "./dist/main.js",
+	"types": "./dist/index.d.ts",
+	"typesVersions": {
+		"*": {
+			"media-types": [
+				"./dist/media-types/index.d.ts"
+			]
+		}
+	},
 	"exports": {
 		".": {
-			"types": "./dist/index.d.ts",
-			"import": "./dist/main.js",
-			"require": "./dist/main.cjs"
+			"import": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/main.js"
+			},
+			"require": {
+				"types": "./dist/index.d.cts",
+				"default": "./dist/main.cjs"
+			}
 		},
 		"./media-types": {
-			"types": "./dist/media-types/index.d.ts",
-			"import": "./dist/media-types.js",
-			"require": "./dist/media-types.cjs"
+			"import": {
+				"types": "./dist/media-types/index.d.ts",
+				"default": "./dist/media-types.js"
+			},
+			"require": {
+				"types": "./dist/media-types/index.d.cts",
+				"default": "./dist/media-types.cjs"
+			}
 		}
 	},
 	"imports": {
-		"#src/media-types": {
-			"oci-client-source": "./src/media-types/index.ts",
-			"types": "./dist/media-types/index.d.ts"
-		},
-		"#src/testutils": {
-			"oci-client-source": "./src/testutils/index.ts"
-		},
-		"#src/*": {
-			"oci-client-source": "./src/*.ts",
-			"types": "./dist/*.d.ts"
-		}
+		"#src/media-types": "./src/media-types/index.ts",
+		"#src/testutils": "./src/testutils/index.ts",
+		"#src/*": "./src/*.ts"
 	},
 	"files": [
 		"dist",
@@ -64,12 +74,14 @@
 	],
 	"scripts": {
 		"build": "tsc && vite build",
+		"check:package": "attw --pack .",
 		"prepare": "npm run build",
 		"test": "vitest",
 		"test:ui": "vitest --ui",
 		"check": "biome check --write ."
 	},
 	"devDependencies": {
+		"@arethetypeswrong/cli": "0.18.5",
 		"@biomejs/biome": "2.5.12",
 		"@types/node": "^26.4.1",
 		"@typescript/typescript6": "^6.0.2",

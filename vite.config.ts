@@ -1,10 +1,13 @@
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, relative, resolve } from 'node:path'
 
 import { playwright } from '@vitest/browser-playwright'
-import { defaultClientConditions, defaultServerConditions } from 'vite'
 import dts from 'vite-plugin-dts'
 import { defaultExclude, defineConfig } from 'vitest/config'
+
+// A statement keeps the quotes of the source but a synthesized `import(...)`
+// type is emitted with double quotes, so both are matched.
+const Specifier = /(\bfrom\s*|\bimport\()(['"])([^'"]+)\2/g
 
 const SrcRoot = resolve(import.meta.dirname, 'src')
 const OutRoot = resolve(import.meta.dirname, 'dist')
@@ -19,20 +22,47 @@ const OutRoot = resolve(import.meta.dirname, 'dist')
  * `media-types.js`, the bundle, and `media-types/`, the declarations, and the
  * file wins.
  *
+ * `#src/*`, the subpath import this repository writes its own modules with, is
+ * resolved here too. Leaving it would tie a consumer's resolver to the package
+ * manifest, which "moduleResolution": "node10" does not read at all.
+ *
  * The declarations mirror the source tree, so a specifier is resolved against
  * `src` and emitted back as an explicit relative path with a `.js` extension.
- * `#src/*` needs none of this: the package manifest defines it, so it resolves
- * wherever the declarations end up.
  */
+/**
+ * Writes the CommonJS twin of an emitted declaration file.
+ *
+ * The package manifest declares `"type": "module"`, so every `.d.ts` describes
+ * an ES module and TypeScript refuses to `require` one. A consumer resolving
+ * through the `require` condition is given these instead, which differ only in
+ * that they are `.d.cts` and name their neighbours as `.cjs`.
+ */
+function writeCommonJsTwin(filePath: string, content: string) {
+	const out = filePath.replace(/\.d\.ts$/, '.d.cts')
+	const body = content
+		.replaceAll(Specifier, (m, head, quote, spec) => (spec.startsWith('.') ? `${head}${quote}${spec.slice(0, -3)}.cjs${quote}` : m))
+		// The map is emitted for the `.d.ts` and its `file` names it.
+		.replace(/\/\/# sourceMappingURL=.*\n?/, '')
+
+	mkdirSync(dirname(out), { recursive: true })
+	writeFileSync(out, body)
+}
+
 function resolveSpecifiers(filePath: string, content: string) {
 	// Map the emitted file back onto the source directory it was emitted from.
 	const dir = resolve(SrcRoot, relative(OutRoot, dirname(filePath)))
 
 	const rewrite = (spec: string) => {
-		// A bare specifier, `#src/*` included, is resolved by the consumer.
-		if (!spec.startsWith('.')) return spec
+		let target: string
+		if (spec.startsWith('#src/')) {
+			target = resolve(SrcRoot, spec.slice('#src/'.length))
+		} else if (spec.startsWith('.')) {
+			target = resolve(dir, spec)
+		} else {
+			// A bare specifier; it is resolved by the consumer.
+			return spec
+		}
 
-		let target = resolve(dir, spec)
 		if (!existsSync(`${target}.ts`)) {
 			if (!existsSync(resolve(target, 'index.ts'))) {
 				// Left as emitted it would only fail in a consumer's build, so
@@ -46,10 +76,6 @@ function resolveSpecifiers(filePath: string, content: string) {
 		return `${rel.startsWith('.') ? rel : `./${rel}`}.js`
 	}
 
-	// A statement keeps the quotes of the source but a synthesized `import(...)`
-	// type is emitted with double quotes, so both are matched.
-	const Specifier = /(\bfrom\s*|\bimport\()(['"])([^'"]+)\2/g
-
 	return content.replaceAll(Specifier, (_, head, quote, spec) => `${head}${quote}${rewrite(spec)}${quote}`)
 }
 
@@ -59,17 +85,13 @@ export default defineConfig({
 			exclude: ['vite.config.ts', 'src/**/*.test.ts', 'src/testutils/**'],
 			beforeWriteFile(filePath, content) {
 				if (!filePath.endsWith('.d.ts')) return
-				return { content: resolveSpecifiers(filePath, content) }
+
+				const resolved = resolveSpecifiers(filePath, content)
+				writeCommonJsTwin(filePath, resolved)
+				return { content: resolved }
 			},
 		}),
 	],
-	resolve: {
-		conditions: ['oci-client-source', ...defaultClientConditions],
-	},
-	ssr: {
-		// The "node" test project resolves through the SSR conditions.
-		resolve: { conditions: ['oci-client-source', ...defaultServerConditions] },
-	},
 	// `REGISTRY_DOMAIN` is exposed to the tests through `import.meta.env`
 	// since `process` is not available in the browser.
 	envPrefix: ['VITE_', 'REGISTRY_'],

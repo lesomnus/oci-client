@@ -34,6 +34,8 @@ jobs:
       - run: npm clean-install
       - run: npx biome ci .
       - run: npm run build
+      # The declarations are emitted, so what a consumer resolves is checked.
+      - run: npm run check:package
 
   test:
     name: node ${{ matrix.node }} / ${{ matrix.registry.kind }}
